@@ -41,8 +41,7 @@
  */
 
 typedef struct {
-	double (*func_even)(long, long, double);
-	double (*func_odd)(long, long, double);
+	double (*func)(double, long, double);
 	double param;
 } wf_iterfunc_t;
 
@@ -53,19 +52,30 @@ rb_wf_iter_cb(wf_iterfunc_t wfif, long len)
 	
 	if (len % 2 == 0) /* サイズが偶数のとき */
 	{
-		for (volatile long i = 0; i < len; i++)
+		for (volatile long i = 0; i < (len/2); i++)
 		{
-			volatile const double value = wfif.func_even(i, len, wfif.param);
-			rb_ary_store(ary, i, DBL2NUM(value));
+			volatile const double value = wfif.func(i, len, wfif.param);
+			VALUE v = DBL2NUM(value);
+			if (i == 0)
+			{
+				rb_ary_store(ary, 0, v);
+				continue;
+			}
+			rb_ary_store(ary, i, v);
+			rb_ary_store(ary, len-i, v);
 		}
+		rb_ary_store(ary, len/2, DBL2NUM(1.));
 	}
 	else /* サイズが奇数のとき */
 	{
-		for (volatile long i = 0; i < len; i++)
+		for (volatile long i = 0; i < (len/2); i++)
 		{
-			volatile const double value = wfif.func_odd(i, len, wfif.param);
-			rb_ary_store(ary, i, DBL2NUM(value));
+			volatile const double value = wfif.func(i+0.5, len, wfif.param);
+			VALUE v = DBL2NUM(value);
+			rb_ary_store(ary, i, v);
+			rb_ary_store(ary, len+~i, v);
 		}
+		rb_ary_store(ary, len/2, DBL2NUM(1.));
 	}
 	return ary;
 }
@@ -77,40 +87,42 @@ rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
 	
 	if (isnan(wfif.param) || wfif.param == 0)
 	{
-		if (len % 2 == 0) /* サイズが偶数のとき */
-		{
-			for (volatile long i = 0; i < len; i++)
-			{
-				volatile const double value = ((-1 + 2. * i / len) == 0);
-				rb_ary_store(ary, i, DBL2NUM(value));
-			}
-		}
-		else /* サイズが奇数のとき */
-		{
-			for (volatile long i = 0; i < len; i++)
-			{
-				volatile const double value = ((-1 + 2 * (i + 0.5) / len) == 0);
-				rb_ary_store(ary, i, DBL2NUM(value));
-			}
-		}
+		VALUE zero = DBL2NUM(0.0);
+		VALUE one = DBL2NUM(1.0);
+		
+		for (volatile long i = 0; i < (len/2); i++)
+			rb_ary_store(ary, i, zero);
+		
+		rb_ary_store(ary, len/2, one);
 	}
 	else
 	{
 		if (len % 2 == 0) /* サイズが偶数のとき */
 		{
-			for (volatile long i = 0; i < len; i++)
+			for (volatile long i = 0; i < (len/2); i++)
 			{
-				volatile const double value = wfif.func_even(i, len, wfif.param);
-				rb_ary_store(ary, i, DBL2NUM(value));
+				volatile const double value = wfif.func(i, len, wfif.param);
+				VALUE v = DBL2NUM(value);
+				if (i == 0)
+				{
+					rb_ary_store(ary, 0, v);
+					continue;
+				}
+				rb_ary_store(ary, i, v);
+				rb_ary_store(ary, len-i, v);
 			}
+			rb_ary_store(ary, len/2, DBL2NUM(1.));
 		}
 		else /* サイズが奇数のとき */
 		{
-			for (volatile long i = 0; i < len; i++)
+			for (volatile long i = 0; i < (len/2); i++)
 			{
-				volatile const double value = wfif.func_odd(i, len, wfif.param);
-				rb_ary_store(ary, i, DBL2NUM(value));
+				volatile const double value = wfif.func(i+0.5, len, wfif.param);
+				VALUE v = DBL2NUM(value);
+				rb_ary_store(ary, i, v);
+				rb_ary_store(ary, len+~i, v);
 			}
+			rb_ary_store(ary, len/2, DBL2NUM(1.));
 		}
 	}
 	return ary;
@@ -142,7 +154,7 @@ rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
 static VALUE
 wf_hann(VALUE unused_obj, VALUE len)
 {
-	wf_iterfunc_t wfif = { wf_hann_even, wf_hann_odd, 0. };
+	wf_iterfunc_t wfif = { wf_hann_eval, 0. };
 	return rb_wf_iter_cb(wfif, NUM2LONG(len));
 }
 
@@ -168,7 +180,7 @@ wf_hann(VALUE unused_obj, VALUE len)
 static VALUE
 wf_hamming(VALUE unused_obj, VALUE len)
 {
-	wf_iterfunc_t wfif = { wf_hamming_even, wf_hamming_odd, 0. };
+	wf_iterfunc_t wfif = { wf_hamming_eval, 0. };
 	return rb_wf_iter_cb(wfif, NUM2LONG(len));
 }
 
@@ -206,14 +218,13 @@ wf_gaussian(int argc, VALUE *argv, VALUE unused_obj)
 	rb_scan_args(argc, argv, "11", &len, &param);
 	if (argc == 1)
 	{
-		wf_iterfunc_t wfif = { wf_gaussian_even, wf_gaussian_odd, 0. };
+		wf_iterfunc_t wfif = { wf_gaussian_eval, 0. };
 		return rb_wf_iter_cb(wfif, NUM2LONG(len));
 	}
 	else
 	{
 		wf_iterfunc_t wfif = { 
-			wf_gaussian_with_param_even, 
-			wf_gaussian_with_param_odd, 
+			wf_gaussian_with_param_eval, 
 			wf_gaussian_calc_param(NUM2DBL(param)) 
 		};
 		return rb_wf_iter_cb_with_zeroarg(wfif, NUM2LONG(len));
