@@ -7,6 +7,13 @@
 #include "include/wave.h"
 #include "internal/algorithm/wf.h"
 
+/*
+ *  module Wave::WindowFunction
+ *  
+ *  Wave::WindowFunctionモジュールは，波形フィルタリングでよく用いられる離散型の窓関数をRubyのユーザレベルから叩けるようにしたフロントエンドである．
+ *  ユーザレベル実装は実行速度よりはアルゴリズム集としてのテストスィートの色が強い．ディジタルフィルタリングではdouble型のスカラ型をアロケートして，役目を終えれば使い捨てるのが実際である．
+ */
+
 typedef struct {
 	double (*func_even)(long, long, double);
 	double (*func_odd)(long, long, double);
@@ -18,7 +25,7 @@ rb_wf_iter_cb(wf_iterfunc_t wfif, long len)
 {
 	VALUE ary = rb_ary_new2(len);
 	
-	if (len % 2 == 0) /* �T�C�Y�������̂Ƃ� */
+	if (len % 2 == 0) /* サイズが偶数のとき */
 	{
 		for (volatile long i = 0; i < len; i++)
 		{
@@ -26,7 +33,7 @@ rb_wf_iter_cb(wf_iterfunc_t wfif, long len)
 			rb_ary_store(ary, i, DBL2NUM(value));
 		}
 	}
-	else /* �T�C�Y����̂Ƃ� */
+	else /* サイズが奇数のとき */
 	{
 		for (volatile long i = 0; i < len; i++)
 		{
@@ -44,7 +51,7 @@ rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
 	
 	if (isnan(wfif.param) || wfif.param == 0)
 	{
-		if (len % 2 == 0) /* �T�C�Y�������̂Ƃ� */
+		if (len % 2 == 0) /* サイズが偶数のとき */
 		{
 			for (volatile long i = 0; i < len; i++)
 			{
@@ -52,7 +59,7 @@ rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
 				rb_ary_store(ary, i, DBL2NUM(value));
 			}
 		}
-		else /* �T�C�Y����̂Ƃ� */
+		else /* サイズが奇数のとき */
 		{
 			for (volatile long i = 0; i < len; i++)
 			{
@@ -63,7 +70,7 @@ rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
 	}
 	else
 	{
-		if (len % 2 == 0) /* �T�C�Y�������̂Ƃ� */
+		if (len % 2 == 0) /* サイズが偶数のとき */
 		{
 			for (volatile long i = 0; i < len; i++)
 			{
@@ -71,7 +78,7 @@ rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
 				rb_ary_store(ary, i, DBL2NUM(value));
 			}
 		}
-		else /* �T�C�Y����̂Ƃ� */
+		else /* サイズが奇数のとき */
 		{
 			for (volatile long i = 0; i < len; i++)
 			{
@@ -91,13 +98,13 @@ rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
  *    Wave::WindowFunction.hann(len) -> [*Float]
  *    Wave::WindowFunction.hanning(len) -> [*Float]
  *  
- *  ���U�^�n�����̔z���Ԃ��Dlen�Ŕz�񐔂��w�肷��D
- *  �n�����͂悭�g���鑋�֐��̈�ł���D
- *  ���U�^�̃n�����͒ʏ�ȉ��Œ�`�����:
+ *  離散型ハン窓の配列を返す．lenで配列数を指定する．
+ *  ハン窓はよく使われる窓関数の一つである．
+ *  離散型のハン窓は通常以下で定義される:
  *  $ w(x)=\frac{1}{2}-\frac{1}{2}\cos(2\pi{x}), 0 \leq x \leq 1 $
- *  �����ŁC�W��$\alpha=\frac{1}{2}$�͗]���̍��̎���$1-\alpha$�ɂ������D
- *  �W���̓p�����^�����邱�Ƃ��ł��C���̎����͈͂�$\frac{1}{2}\leq\alpha\leq\1$�ł���D
- *  �n���������ǂ����n�~���O���̌W����$\frac{25}{46}$�ł���C�͈͓��ł���D
+ *  ここで，係数$\alpha=\frac{1}{2}$は余弦の項の次数$1-\alpha$におかれる．
+ *  係数はパラメタ化することができ，その実効範囲は$\frac{1}{2}\leq\alpha\leq\1$である．
+ *  ハン窓を改良したハミング窓の係数は$\frac{25}{46}$であり，範囲内である．
  *  
  *    Wave::WindowFunction.hann(5)
  *    # => [0.09549150281252627,
@@ -120,9 +127,9 @@ wf_hann(VALUE unused_obj, VALUE len)
  *  call-seq:
  *    Wave::WindowFunction.hamming(len) -> [*Float]
  *  
- *  ���U�^�n�~���O���̔z���Ԃ��Dlen�Ŕz�񐔂��w�肷��D
- *  �n�~���O���͂悭�g���鑋�֐��̈�ł���D
- *  ���U�^�̃n�~���O���͒ʏ�ȉ��Œ�`�����:
+ *  離散型ハミング窓の配列を返す．lenで配列数を指定する．
+ *  ハミング窓はよく使われる窓関数の一つである．
+ *  離散型のハミング窓は通常以下で定義される:
  *  $ w(x)=\frac{25}{46}-\frac{21}{46}\cos(2\pi{x}), 0 \leq x \leq 1 $
  *  
  *     Wave::WindowFunction.hamming(5)
@@ -147,10 +154,10 @@ wf_hamming(VALUE unused_obj, VALUE len)
  *    Wave::WindowFunction.gaussian(len) -> [*Float]
  *    Wave::WindowFunction.gaussian(len, sigma) -> [*Float]
  
- *  ���U�^�K�E�X���̔z���Ԃ��Dlen�Ŕz�񐔂��w�肷��D
- *  ��ʂɁC���U�^�̃K�E�X���͈ȉ��̎��𖞂����D
+ *  離散型ガウス窓の配列を返す．lenで配列数を指定する．
+ *  一般に，離散型のガウス窓は以下の式を満たす．
  *  $w(x)=e^{-((-1+2x)^2/8\sigma^2)}$
- *  �����ŁC$\sigma$�͕W���΍��ł���D�W���΍���$3/10$�Ƃ����Ƃ��C�ȉ��𓙎��Ƃ���D
+ *  ここで，$\sigma$は標準偏差である．標準偏差は$3/10$としたとき，以下を等式とする．
  *  $w(x) = w(x, 3/10)$
  
  *    Wave::WindowFunction.gaussian(5)
