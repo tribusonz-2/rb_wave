@@ -40,46 +40,6 @@
  *    # =>  0.09549150281252633]
  */
 
-typedef struct {
-	double (*func)(double, long, double);
-	double param;
-} wf_iterfunc_t;
-
-static inline VALUE
-rb_wf_iter_cb(wf_iterfunc_t wfif, long len)
-{
-	VALUE ary = rb_ary_new2(len);
-	
-	if (len % 2 == 0) /* サイズが偶数のとき */
-	{
-		for (volatile long i = 0; i < (len/2); i++)
-		{
-			volatile const double value = wfif.func(i, len, wfif.param);
-			VALUE v = DBL2NUM(value);
-			if (i == 0)
-			{
-				rb_ary_store(ary, 0, v);
-				continue;
-			}
-			rb_ary_store(ary, i, v);
-			rb_ary_store(ary, len-i, v);
-		}
-		rb_ary_store(ary, len/2, DBL2NUM(1.));
-	}
-	else /* サイズが奇数のとき */
-	{
-		for (volatile long i = 0; i < (len/2); i++)
-		{
-			volatile const double value = wfif.func(i+0.5, len, wfif.param);
-			VALUE v = DBL2NUM(value);
-			rb_ary_store(ary, i, v);
-			rb_ary_store(ary, len+~i, v);
-		}
-		rb_ary_store(ary, len/2, DBL2NUM(1.));
-	}
-	return ary;
-}
-
 static inline VALUE
 rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
 {
@@ -90,8 +50,9 @@ rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
 		VALUE zero = DBL2NUM(0.0);
 		VALUE one = DBL2NUM(1.0);
 		
-		for (volatile long i = 0; i < (len/2); i++)
+		for (volatile long i = 0; i < len; i++)
 			rb_ary_store(ary, i, zero);
+			
 		
 		rb_ary_store(ary, len/2, one);
 	}
@@ -131,6 +92,13 @@ rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
 
 #include "internal/solver/window_function/hann.h"
 
+static void
+wf_cb_hann(double unused_param, long len, double w[])
+{
+	wf_iterfunc_t wfif = { wf_hann_eval, 0. };
+	wf_iter_cb(wfif, len, w);
+}
+
 /*
  *  call-seq:
  *    Wave::WindowFunction.hann(len) -> [*Float]
@@ -154,12 +122,18 @@ rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
 static VALUE
 wf_hann(VALUE unused_obj, VALUE len)
 {
-	wf_iterfunc_t wfif = { wf_hann_eval, 0. };
-	return rb_wf_iter_cb(wfif, NUM2LONG(len));
+	return rb_wf_iter(wf_cb_hann, NUM2LONG(len), 0.);
 }
 
 
 #include "internal/solver/window_function/hamming.h"
+
+static void
+wf_cb_hamming(double unused_param, long len, double w[])
+{
+	wf_iterfunc_t wfif = { wf_hamming_eval, 0. };
+	wf_iter_cb(wfif, len, w);
+}
 
 /*
  *  call-seq:
@@ -180,12 +154,30 @@ wf_hann(VALUE unused_obj, VALUE len)
 static VALUE
 wf_hamming(VALUE unused_obj, VALUE len)
 {
-	wf_iterfunc_t wfif = { wf_hamming_eval, 0. };
-	return rb_wf_iter_cb(wfif, NUM2LONG(len));
+	return rb_wf_iter(wf_cb_hamming, NUM2LONG(len), 0.);
 }
 
+
 #include "internal/solver/window_function/gaussian.h"
+
+static void
+wf_cb_gaussian(double unused_param, long len, double w[])
+{
+	wf_iterfunc_t wfif = { wf_gaussian_eval, 0. };
+	wf_iter_cb(wfif, len, w);
+}
+
 #include "internal/solver/window_function/gaussian_with_param.h"
+
+static void
+wf_cb_gaussian_with_param(double sigma, long len, double w[])
+{
+	wf_iterfunc_t wfif = { 
+		wf_gaussian_with_param_eval, 
+		wf_gaussian_calc_param(sigma) 
+	};
+	wf_iter_cb_with_paramzero(wfif, len, w);
+}
 
 /*
  *  call-seq:
@@ -218,16 +210,11 @@ wf_gaussian(int argc, VALUE *argv, VALUE unused_obj)
 	rb_scan_args(argc, argv, "11", &len, &param);
 	if (argc == 1)
 	{
-		wf_iterfunc_t wfif = { wf_gaussian_eval, 0. };
-		return rb_wf_iter_cb(wfif, NUM2LONG(len));
+		return rb_wf_iter(wf_cb_gaussian, NUM2LONG(len), 0.);
 	}
 	else
 	{
-		wf_iterfunc_t wfif = { 
-			wf_gaussian_with_param_eval, 
-			wf_gaussian_calc_param(NUM2DBL(param)) 
-		};
-		return rb_wf_iter_cb_with_zeroarg(wfif, NUM2LONG(len));
+		return rb_wf_iter(wf_cb_gaussian_with_param, NUM2LONG(len), NUM2DBL(param));
 	}
 }
 
