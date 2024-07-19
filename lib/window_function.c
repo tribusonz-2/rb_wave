@@ -248,14 +248,15 @@ wf_cb_kaiser_with_param(double alpha, long len, double w[])
 /*
  *  call-seq:
  *    Wave::WindowFunction.kaiser(x) -> [*Float]
+ *    Wave::WindowFunction.kaiser(x, alpha) -> [*Float]
  *  
  *  離散型カイザー窓の配列を返す．lenで配列数を指定する．
  *  カイザー窓はカイザー・ベッセル窓としても知られ，一般に有限インパルス応答{FIR}フィルタ設計とスペクトル分析に使用される．
  *  離散型のカイザー窓は次式
  *  $ w(x)=\frac{I_0(\alpha 2 \sqrt{-(x-1)x}}{I_0(\alpha)} $
  *  を得る．
- *  ただし，$ I_n(x) $は第一種変形ベッセル関数，nはそのゼロ次であり．$\alpha$は形状パラメタである．
- *  以下の関係は等価である．
+ *  ただし，$ I_n(x) $は第一種変形ベッセル関数，nはゼロ次であり．$\alpha$は形状パラメタである．
+ *  以下は等価である．
  *  $ w(x) = w(x, 3) $
  *  
  *    Wave::WindowFunction.kaiser(5)

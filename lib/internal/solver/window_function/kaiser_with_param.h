@@ -6,17 +6,22 @@ extern "C" {
 #endif
 
 static inline double
-wf_kaiser_calc_param(double alpha)
-{
-	return cyl_bessel_i0(alpha);
-}
-
-static inline double
 wf_kaiser_with_param_eval(double n, long N, double alpha)
 {
-	const double x = n / N, denom = cyl_bessel_i0(alpha);
+	const double x = n / N;
+	static double prev_alpha, denom;
+	static int check;
+	static bool reach_inf = false;
 	
-	if (isinf(denom))
+	if (!check || prev_alpha != alpha)
+	{
+		prev_alpha = alpha;
+		denom = cyl_bessel_i0(prev_alpha);
+		reach_inf = isinf(denom) ? true : false;
+		if (!check)  check++;
+	}
+	
+	if (reach_inf)
 		return x == 0.5;
 	/* else */
 		return cyl_bessel_i0(alpha * 2 * sqrt(-(x - 1) * x)) / denom;

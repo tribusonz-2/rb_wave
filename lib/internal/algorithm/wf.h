@@ -11,7 +11,7 @@ extern "C" {
 
 enum WFIF_ITER_TYPE {
 	WFIF_ITER_1D,   // 1-dimensional Iterator
-	WFIF_ITER_MDCT1 // Modified-DCT with convolusional product
+	WFIF_ITER_MDCT1 // Modified-DCT with convolutional product
 } ;
 
 enum WFIF_SP_EVAL_TYPE {
