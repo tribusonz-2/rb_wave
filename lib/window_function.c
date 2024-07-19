@@ -7,6 +7,12 @@
 #include "include/wave.h"
 #include "internal/algorithm/wf.h"
 
+#ifndef HAVE_CYL_BESSEL_I0
+double cyl_bessel_i0(double);
+# include "missing/cyl_bessel_i0.c"
+#endif
+
+
 /*
  *  module Wave::WindowFunction
  *  
@@ -40,62 +46,23 @@
  *    # =>  0.09549150281252633]
  */
 
-static inline VALUE
-rb_wf_iter_cb_with_zeroarg(wf_iterfunc_t wfif, long len)
-{
-	VALUE ary = rb_ary_new2(len);
-	
-	if (isnan(wfif.param) || wfif.param == 0)
-	{
-		VALUE zero = DBL2NUM(0.0);
-		VALUE one = DBL2NUM(1.0);
-		
-		for (volatile long i = 0; i < len; i++)
-			rb_ary_store(ary, i, zero);
-			
-		
-		rb_ary_store(ary, len/2, one);
-	}
-	else
-	{
-		if (len % 2 == 0) /* サイズが偶数のとき */
-		{
-			for (volatile long i = 0; i < (len/2); i++)
-			{
-				volatile const double value = wfif.func(i, len, wfif.param);
-				VALUE v = DBL2NUM(value);
-				if (i == 0)
-				{
-					rb_ary_store(ary, 0, v);
-					continue;
-				}
-				rb_ary_store(ary, i, v);
-				rb_ary_store(ary, len-i, v);
-			}
-			rb_ary_store(ary, len/2, DBL2NUM(1.));
-		}
-		else /* サイズが奇数のとき */
-		{
-			for (volatile long i = 0; i < (len/2); i++)
-			{
-				volatile const double value = wfif.func(i+0.5, len, wfif.param);
-				VALUE v = DBL2NUM(value);
-				rb_ary_store(ary, i, v);
-				rb_ary_store(ary, len+~i, v);
-			}
-			rb_ary_store(ary, len/2, DBL2NUM(1.));
-		}
-	}
-	return ary;
-}
 
-
+/*******************************************************************************
+	ハン窓
+*******************************************************************************/
 #include "internal/solver/window_function/hann.h"
 
 static void
 wf_cb_hann(double unused_param, long len, double w[])
 {
-	wf_iterfunc_t wfif = { wf_hann_eval, 0. };
+	wf_iterfunc_t wfif = {
+		wf_hann_eval,
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+		 };
 	wf_iter_cb(wfif, len, w);
 }
 
@@ -126,12 +93,22 @@ wf_hann(VALUE unused_obj, VALUE len)
 }
 
 
+/*******************************************************************************
+	ハミング窓
+*******************************************************************************/
 #include "internal/solver/window_function/hamming.h"
 
 static void
 wf_cb_hamming(double unused_param, long len, double w[])
 {
-	wf_iterfunc_t wfif = { wf_hamming_eval, 0. };
+	wf_iterfunc_t wfif = {
+		wf_hamming_eval, 
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
 	wf_iter_cb(wfif, len, w);
 }
 
@@ -158,12 +135,22 @@ wf_hamming(VALUE unused_obj, VALUE len)
 }
 
 
+/*******************************************************************************
+	ガウス窓
+*******************************************************************************/
 #include "internal/solver/window_function/gaussian.h"
 
 static void
 wf_cb_gaussian(double unused_param, long len, double w[])
 {
-	wf_iterfunc_t wfif = { wf_gaussian_eval, 0. };
+	wf_iterfunc_t wfif = {
+		wf_gaussian_eval, 
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
 	wf_iter_cb(wfif, len, w);
 }
 
@@ -172,11 +159,15 @@ wf_cb_gaussian(double unused_param, long len, double w[])
 static void
 wf_cb_gaussian_with_param(double sigma, long len, double w[])
 {
-	wf_iterfunc_t wfif = { 
+	wf_iterfunc_t wfif = {
 		wf_gaussian_with_param_eval, 
-		wf_gaussian_calc_param(sigma) 
+		wf_gaussian_calc_param(sigma),
+		WFIF_ITER_1D,
+		WFIF_KURT,
+		WFIF_NOCNTL,
+		WFIF_KURT
 	};
-	wf_iter_cb_with_paramzero(wfif, len, w);
+	wf_iter_cb(wfif, len, w);
 }
 
 /*
@@ -218,6 +209,95 @@ wf_gaussian(int argc, VALUE *argv, VALUE unused_obj)
 	}
 }
 
+/*******************************************************************************
+	カイザー窓
+*******************************************************************************/
+#include "internal/solver/window_function/kaiser.h"
+
+static void
+wf_cb_kaiser(double unused_param, long len, double w[])
+{
+	wf_iterfunc_t wfif = {
+		wf_kaiser_eval, 
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+#include "internal/solver/window_function/kaiser_with_param.h"
+
+static void
+wf_cb_kaiser_with_param(double alpha, long len, double w[])
+{
+	wf_iterfunc_t wfif = { 
+		wf_kaiser_with_param_eval, 
+		alpha,
+		WFIF_ITER_1D,
+		WFIF_KURT,
+		WFIF_KURT,
+		WFIF_RECT
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.kaiser(x) -> [*Float]
+ *  
+ *  離散型カイザー窓の配列を返す．lenで配列数を指定する．
+ *  カイザー窓はカイザー・ベッセル窓としても知られ，一般に有限インパルス応答{FIR}フィルタ設計とスペクトル分析に使用される．
+ *  離散型のカイザー窓は次式
+ *  $ w(x)=\frac{I_0(\alpha 2 \sqrt{-(x-1)x}}{I_0(\alpha)} $
+ *  を得る．
+ *  ただし，$ I_n(x) $は第一種変形ベッセル関数，nはそのゼロ次であり．$\alpha$は形状パラメタである．
+ *  以下の関係は等価である．
+ *  $ w(x) = w(x, 3) $
+ *  
+ *    Wave::WindowFunction.kaiser(5)
+ *    # => [0.4076303841265242,
+ *    # =>  0.8184078580166961,
+ *    # =>  1.0,
+ *    # =>  0.8184078580166961,
+ *    # =>  0.4076303841265242]
+ *    Wave::WindowFunction.kaiser(5, 3)
+ *    # => [0.4076303841265242,
+ *    # =>  0.8184078580166961,
+ *    # =>  1.0,
+ *    # =>  0.8184078580166961,
+ *    # =>  0.4076303841265242]
+ */
+
+static VALUE
+wf_kaiser(int argc, VALUE *argv, VALUE unused_obj)
+{
+	VALUE len, param = Qnil;
+	rb_scan_args(argc, argv, "11", &len, &param);
+	if (argc == 1)
+	{
+		return rb_wf_iter(wf_cb_kaiser, NUM2LONG(len), 0.);
+	}
+	else
+	{
+		return rb_wf_iter(wf_cb_kaiser_with_param, NUM2LONG(len), NUM2DBL(param));
+	}
+}
+
+
+#define TEST
+#ifdef TEST
+static VALUE
+math_cyl_bessel_i0(VALUE unused_obj, VALUE x)
+{
+	return DBL2NUM(cyl_bessel_i0(NUM2DBL(x)));
+}
+#endif
+
+/******************************************************************************/
 
 void
 InitVM_WindowFunction(void)
@@ -226,5 +306,10 @@ InitVM_WindowFunction(void)
 	rb_define_module_function(rb_mWaveWindowFunction, "hanning", wf_hann, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "hamming", wf_hamming, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "gaussian", wf_gaussian, -1);
+	rb_define_module_function(rb_mWaveWindowFunction, "kaiser", wf_kaiser, -1);
+
+#ifdef TEST
+	rb_define_module_function(rb_mMath, "cyl_bessel_i0", math_cyl_bessel_i0, 1);
+#endif
 }
 

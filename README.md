@@ -8,3 +8,4 @@
     * `#hann` (ハン窓)  
     * `#hamming` (ハミング窓)  
     * `#gaussian` (ガウス窓)  
+    * `#kaiser` (カイザー窓)  
