@@ -67,7 +67,7 @@ wf_cb_hann(double unused_param, long len, double w[])
 		WFIF_NOCNTL,
 		WFIF_NOCNTL,
 		WFIF_NOCNTL
-		 };
+	};
 	wf_iter_cb(wfif, len, w);
 }
 
@@ -249,7 +249,6 @@ wf_cb_kaiser_with_param(double alpha, long len, double w[])
 	wf_iter_cb(wfif, len, w);
 }
 
-
 /*
  *  call-seq:
  *    Wave::WindowFunction.kaiser(x) -> [*Float]
@@ -277,7 +276,6 @@ wf_cb_kaiser_with_param(double alpha, long len, double w[])
  *    # =>  0.8184078580166961,
  *    # =>  0.4076303841265242]
  */
-
 static VALUE
 wf_kaiser(int argc, VALUE *argv, VALUE unused_obj)
 {
@@ -293,15 +291,48 @@ wf_kaiser(int argc, VALUE *argv, VALUE unused_obj)
 	}
 }
 
+/*******************************************************************************
+	KBD窓 (カイザー・ベッセル派生窓)
+*******************************************************************************/
+#include "internal/solver/window_function/kbd_with_param.h"
 
-#define TEST
-#ifdef TEST
-static VALUE
-math_cyl_bessel_i0(VALUE unused_obj, VALUE x)
+static void
+wf_cb_kbd_with_param(double alpha, long len, double w[])
 {
-	return DBL2NUM(cyl_bessel_i0(NUM2DBL(x)));
+	wf_iterfunc_t wfif = { 
+		wf_kbd_with_param_eval, 
+		alpha,
+		WFIF_ITER_MDCT,
+		WFIF_RECT,
+		WFIF_RECT,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
 }
-#endif
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.kbd(x, alpha) -> [*Float]
+ *  
+ *  離散型KBD窓の配列を返す．lenで配列数を指定する．
+ *  KBD窓はカイザー・ベッセル・派生窓の頭文字語であり，カイザー窓を修正離散コサイン変換(MDCT)での使用に設計したものである．
+ *  
+ *    Wave::WindowFunction.kbd(5, 3)
+ *    # => [0.4114947429371883,
+ *    # =>  0.9996957233074878,
+ *    # =>  1.0,
+ *    # =>  0.9996957233074878,
+ *    # =>  0.4114947429371883]
+ */
+static VALUE
+wf_kbd(int argc, VALUE *argv, VALUE unused_obj)
+{
+	VALUE len, param;
+	rb_scan_args(argc, argv, "20", &len, &param);
+	
+	return rb_wf_iter(wf_cb_kbd_with_param, NUM2LONG(len), NUM2DBL(param));
+}
+
 
 /******************************************************************************/
 
@@ -313,9 +344,176 @@ InitVM_WindowFunction(void)
 	rb_define_module_function(rb_mWaveWindowFunction, "hamming", wf_hamming, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "gaussian", wf_gaussian, -1);
 	rb_define_module_function(rb_mWaveWindowFunction, "kaiser", wf_kaiser, -1);
-
-#ifdef TEST
-	rb_define_module_function(rb_mMath, "cyl_bessel_i0", math_cyl_bessel_i0, 1);
-#endif
+	rb_define_module_function(rb_mWaveWindowFunction, "kbd", wf_kbd, -1);
 }
 
+// レクタンギュラの配列を作る
+static inline void
+wf_iter_make_rect(long N, double w[])
+{
+	for (volatile long n = 0; n < N; n++)
+		w[n] = 1.;
+}
+
+// 中央値が1，他が0の配列を作る
+static inline void
+wf_iter_make_kurt(long N, double w[])
+{
+	if (N % 2 == 0) /* サイズが偶数のとき */
+	{
+		for (volatile long n = 0; n < (N/2); n++)
+		{
+			if (n == 0)
+			{
+				w[n] = 0.;
+				continue;
+			}
+			w[n] = 0.;
+			w[N-n] = 0.;
+		}
+		w[N/2] = 1.;
+	}
+	else /* サイズが奇数のとき */
+	{
+		for (volatile long n = 0; n < (N/2); n++)
+		{
+			w[n] = 0;
+			w[N-1-n] = 0;
+		}
+		w[N/2] = 1.;
+	}
+}
+
+// 特殊な窓関数配列を生成する
+static inline void
+wf_iter_cb_sp(enum WFIF_SP_EVAL_TYPE handle, long N, double w[])
+{
+	switch (handle) {
+	case WFIF_RECT:
+		wf_iter_make_rect(N, w);
+		break;
+	case WFIF_KURT:
+		wf_iter_make_kurt(N, w);
+		break;
+	case WFIF_NOCNTL:
+	default:
+		break;
+	}
+}
+
+// エラーハンドリング
+static inline enum WFIF_SP_EVAL_TYPE
+wf_iter_errhdl(wf_iterfunc_t wfif)
+{
+	enum WFIF_SP_EVAL_TYPE handle = WFIF_NOCNTL;
+	
+	if (wfif.handle_param_nan != WFIF_NOCNTL && isnan(wfif.param))
+		handle = wfif.handle_param_nan;
+	else if (wfif.handle_param_inf != WFIF_NOCNTL && isinf(wfif.param))
+		handle = wfif.handle_param_inf;
+	else if (wfif.handle_param_zero != WFIF_NOCNTL && (wfif.param == 0))
+		handle = wfif.handle_param_zero;
+	
+	return handle;
+}
+
+// 一元イテレータ・ルール
+static inline void
+wf_iter_rule_1d(wf_iterfunc_t wfif, long N, double w[])
+{
+	if (N % 2 == 0) /* サイズが偶数のとき */
+	{
+		for (volatile long n = 0; n < (N/2); n++)
+		{
+			volatile const double value = wfif.iterfunc(n, N, wfif.param);
+			if (n == 0)
+			{
+				w[n] = value;
+				continue;
+			}
+			w[n] = value;
+			w[N-n] = value;
+		}
+		w[N/2] = 1.;
+	}
+	else /* サイズが奇数のとき */
+	{
+		for (volatile long n = 0; n < (N/2); n++)
+		{
+			volatile const double value = wfif.iterfunc(n+0.5, N, wfif.param);
+			w[n] = value;
+			w[N-1-n] = value;
+		}
+		w[N/2] = 1.;
+	}
+}
+
+// MDCTイテレータ・ルール(畳み込み和ルーチン)
+static inline void
+wf_iter_rule_mdct(wf_iterfunc_t wfif, long N, double w[])
+{
+	double sum = 0.;
+	
+	if (N % 2 == 0) /* サイズが偶数のとき */
+	{
+		for (volatile long n = 0; n < (N/2); n++)
+		{
+			volatile const double value = wfif.iterfunc(n, N, wfif.param);
+			sum += value;
+			w[n] = sum;
+		}
+		sum += wfif.iterfunc(N/2, N, wfif.param);
+		for (volatile long n = 0; n < (N/2); n++)
+		{
+			RUBY_ASSERT(signbit(w[n]));
+			w[n] = isinf(w[n]) ? 1. : sqrt(w[n]/sum);
+			if (n == 0)  continue;
+			w[N-n] = w[n];
+		}
+		w[N/2] = 1.;
+	}
+	else /* サイズが奇数のとき */
+	{
+		for (volatile long n = 0; n < (N/2); n++)
+		{
+			volatile const double value = wfif.iterfunc(n+0.5, N, wfif.param);
+			sum += value;
+			w[n] = sum;
+		}
+		sum += wfif.iterfunc(N/2.0, N, wfif.param);
+		for (volatile long n = 0; n < (N/2); n++)
+		{
+			RUBY_ASSERT(signbit(w[n]));
+			w[n] = isinf(w[n]) ? 1. : sqrt(w[n]/sum);
+			w[N-1-n] = w[n];
+		}
+		w[N/2] = 1.;
+	}
+}
+
+
+void
+wf_iter_cb(wf_iterfunc_t wfif, long N, double w[])
+{
+	RUBY_ASSERT(wfif.iterfunc == NULL);
+	
+	enum WFIF_SP_EVAL_TYPE handle = wf_iter_errhdl(wfif);
+	
+	if (handle != WFIF_NOCNTL)
+	{
+		wf_iter_cb_sp(handle, N, w);
+	}
+	else
+	{
+		switch (wfif.iter_rule) {
+		case WFIF_ITER_1D:
+			wf_iter_rule_1d(wfif, N, w);
+			break;
+		case WFIF_ITER_MDCT:
+			wf_iter_rule_mdct(wfif, N, w);
+			break;
+		default:
+			break;
+		}
+	}
+}

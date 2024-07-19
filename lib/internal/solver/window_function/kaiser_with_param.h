@@ -10,15 +10,14 @@ wf_kaiser_with_param_eval(double n, long N, double alpha)
 {
 	const double x = n / N;
 	static double prev_alpha, denom;
-	static int check;
-	static bool reach_inf = false;
+	static bool check = false, reach_inf = false;
 	
 	if (!check || prev_alpha != alpha)
 	{
 		prev_alpha = alpha;
 		denom = cyl_bessel_i0(prev_alpha);
 		reach_inf = isinf(denom) ? true : false;
-		if (!check)  check++;
+		if (!check)  check = true;
 	}
 	
 	if (reach_inf)
