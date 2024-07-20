@@ -69,6 +69,41 @@ rb_wf_ary_new(void (*func)(double, long, double *), long len, double param)
 	return ary;
 }
 
+/*******************************************************************************
+	レクタンギュラ窓
+*******************************************************************************/
+#include "internal/solver/window_function/rectangular.h"
+
+static void
+wf_cb_rectangular(double unused_param, long len, double w[])
+{
+	wf_iterfunc_t wfif = {
+		wf_rectangular_eval,
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.rectangular(len) -> [*Float]
+ *  
+ *  離散型レクタンギュラ窓の配列を返す．lenで配列数を指定する．
+ *  レクタンギュラ窓はよく使われる窓関数の一つである．常に1.0のスカラー量となる．
+ *  
+ *    Wave::WindowFunction.rectangular(5)
+ *    # => [1.0, 1.0, 1.0, 1.0, 1.0]
+ */
+static VALUE
+wf_rectangular(VALUE unused_obj, VALUE len)
+{
+	return rb_wf_ary_new(wf_cb_rectangular, NUM2LONG(len), 0.);
+}
+
 
 /*******************************************************************************
 	ハン窓
@@ -156,6 +191,87 @@ wf_hamming(VALUE unused_obj, VALUE len)
 	return rb_wf_ary_new(wf_cb_hamming, NUM2LONG(len), 0.);
 }
 
+/*******************************************************************************
+	バートレット窓
+*******************************************************************************/
+#include "internal/solver/window_function/bartlett.h"
+
+static void
+wf_cb_bartlett(double unused_param, long len, double w[])
+{
+	wf_iterfunc_t wfif = {
+		wf_bartlett_eval,
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.bartlett(len) -> [*Float]
+ *  
+ *  離散型バートレット窓の配列を返す．lenで配列数を指定する．
+ *  バートレット窓は三角窓とも呼ばれ，よくリファレンスに出てくる窓関数である．
+ *  定義式は以下で表せる．
+ *  $w(x)=1-2\left| x-\frac{1}{2} \right|, 0 \leq x \leq 1$
+ 
+ *    Wave::WindowFunction.bartlett(5)
+ *    # => [0.19999999999999996, 
+ *    # =>  0.6,
+ *    # =>  1.0, 
+ *    # =>  0.6, 
+ *    # =>  0.19999999999999996]
+ */
+static VALUE
+wf_bartlett(VALUE unused_obj, VALUE len)
+{
+	return rb_wf_ary_new(wf_cb_bartlett, NUM2LONG(len), 0.);
+}
+
+/*******************************************************************************
+	ブラックマン窓
+*******************************************************************************/
+#include "internal/solver/window_function/blackman.h"
+
+static void
+wf_cb_blackman(double unused_param, long len, double w[])
+{
+	wf_iterfunc_t wfif = {
+		wf_blackman_eval,
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.blackman(len) -> [*Float]
+ *  
+ *  離散型ブラックマン窓の配列を返す．lenで配列数を指定する．
+ *  ブラックマン窓はよく使われる窓関数である．
+ *  定義式は以下で表せる．
+ *  $w(x)=0.42-0.5\cos(2\pi x)+0.08\cos(4\pi x), 0 \leq x \leq 1$
+ *  
+ *    Wave::WindowFunction.blackman(5)
+ *    # => [0.040212862362522056,
+ *    # =>  0.5097871376374778,
+ *    # =>  1.0,
+ *    # =>  0.5097871376374778,
+ *    # =>  0.040212862362522056]
+ */
+static VALUE
+wf_blackman(VALUE unused_obj, VALUE len)
+{
+	return rb_wf_ary_new(wf_cb_blackman, NUM2LONG(len), 0.);
+}
 
 /*******************************************************************************
 	ガウス窓
@@ -357,9 +473,12 @@ wf_kbd(int argc, VALUE *argv, VALUE unused_obj)
 void
 InitVM_WindowFunction(void)
 {
+	rb_define_module_function(rb_mWaveWindowFunction, "rectangular", wf_rectangular, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "hann", wf_hann, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "hanning", wf_hann, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "hamming", wf_hamming, 1);
+	rb_define_module_function(rb_mWaveWindowFunction, "bartlett", wf_bartlett, 1);
+	rb_define_module_function(rb_mWaveWindowFunction, "blackman", wf_blackman, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "gaussian", wf_gaussian, -1);
 	rb_define_module_function(rb_mWaveWindowFunction, "kaiser", wf_kaiser, -1);
 	rb_define_module_function(rb_mWaveWindowFunction, "kbd", wf_kbd, -1);
