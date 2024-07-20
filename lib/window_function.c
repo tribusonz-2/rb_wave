@@ -4,6 +4,8 @@
 	Author: Hironobu Inatsuka
 *******************************************************************************/
 #include <ruby.h>
+//#include <ruby/internal/memory.h> // ALLOC_N()
+//#include <ruby/internal/intern/array.h> // rb_ary_new(), rb_ary_store()
 #include "include/wave.h"
 #include "internal/algorithm/wf.h"
 
@@ -52,6 +54,22 @@ double cyl_bessel_i0(double);
  */
 
 
+
+static inline VALUE
+rb_wf_ary_new(void (*func)(double, long, double *), long len, double param)
+{
+	VALUE ary = rb_ary_new2(len);
+	double *w = ALLOC_N(double, len);
+	
+	func(param, len, w);
+	
+	for (volatile long n = 0; n < len; n++)
+		rb_ary_store(ary, n, DBL2NUM(w[n]));
+	
+	return ary;
+}
+
+
 /*******************************************************************************
 	ハン窓
 *******************************************************************************/
@@ -78,11 +96,10 @@ wf_cb_hann(double unused_param, long len, double w[])
  *  
  *  離散型ハン窓の配列を返す．lenで配列数を指定する．
  *  ハン窓はよく使われる窓関数の一つである．
+ *  この関数はパラメタ修正されたハミング窓に因んでハニング窓とも呼ばれる．
  *  離散型のハン窓は通常以下で定義される:
  *  $ w(x)=\frac{1}{2}-\frac{1}{2}\cos(2\pi{x}), 0 \leq x \leq 1 $
- *  ここで，係数$\alpha=\frac{1}{2}$は余弦の項の次数$1-\alpha$におかれる．
- *  係数はパラメタ化することができ，その実効範囲は$\frac{1}{2}\leq\alpha\leq\1$である．
- *  ハン窓を改良したハミング窓の係数は$\frac{25}{46}$であり，範囲内である．
+ *  ここで，係数$\alpha=\frac{1}{2}$は余弦の項の次数$1-\alpha$の関係がある．
  *  
  *    Wave::WindowFunction.hann(5)
  *    # => [0.09549150281252627,
@@ -94,7 +111,7 @@ wf_cb_hann(double unused_param, long len, double w[])
 static VALUE
 wf_hann(VALUE unused_obj, VALUE len)
 {
-	return rb_wf_iter(wf_cb_hann, NUM2LONG(len), 0.);
+	return rb_wf_ary_new(wf_cb_hann, NUM2LONG(len), 0.);
 }
 
 
@@ -136,7 +153,7 @@ wf_cb_hamming(double unused_param, long len, double w[])
 static VALUE
 wf_hamming(VALUE unused_obj, VALUE len)
 {
-	return rb_wf_iter(wf_cb_hamming, NUM2LONG(len), 0.);
+	return rb_wf_ary_new(wf_cb_hamming, NUM2LONG(len), 0.);
 }
 
 
@@ -206,11 +223,11 @@ wf_gaussian(int argc, VALUE *argv, VALUE unused_obj)
 	rb_scan_args(argc, argv, "11", &len, &param);
 	if (argc == 1)
 	{
-		return rb_wf_iter(wf_cb_gaussian, NUM2LONG(len), 0.);
+		return rb_wf_ary_new(wf_cb_gaussian, NUM2LONG(len), 0.);
 	}
 	else
 	{
-		return rb_wf_iter(wf_cb_gaussian_with_param, NUM2LONG(len), NUM2DBL(param));
+		return rb_wf_ary_new(wf_cb_gaussian_with_param, NUM2LONG(len), NUM2DBL(param));
 	}
 }
 
@@ -283,11 +300,11 @@ wf_kaiser(int argc, VALUE *argv, VALUE unused_obj)
 	rb_scan_args(argc, argv, "11", &len, &param);
 	if (argc == 1)
 	{
-		return rb_wf_iter(wf_cb_kaiser, NUM2LONG(len), 0.);
+		return rb_wf_ary_new(wf_cb_kaiser, NUM2LONG(len), 0.);
 	}
 	else
 	{
-		return rb_wf_iter(wf_cb_kaiser_with_param, NUM2LONG(len), NUM2DBL(param));
+		return rb_wf_ary_new(wf_cb_kaiser_with_param, NUM2LONG(len), NUM2DBL(param));
 	}
 }
 
@@ -330,12 +347,13 @@ wf_kbd(int argc, VALUE *argv, VALUE unused_obj)
 	VALUE len, param;
 	rb_scan_args(argc, argv, "20", &len, &param);
 	
-	return rb_wf_iter(wf_cb_kbd_with_param, NUM2LONG(len), NUM2DBL(param));
+	return rb_wf_ary_new(wf_cb_kbd_with_param, NUM2LONG(len), NUM2DBL(param));
 }
 
 
 /******************************************************************************/
 
+// エントリポイント
 void
 InitVM_WindowFunction(void)
 {
@@ -346,6 +364,10 @@ InitVM_WindowFunction(void)
 	rb_define_module_function(rb_mWaveWindowFunction, "kaiser", wf_kaiser, -1);
 	rb_define_module_function(rb_mWaveWindowFunction, "kbd", wf_kbd, -1);
 }
+
+/*******************************************************************************
+	for C API
+*******************************************************************************/
 
 // レクタンギュラの配列を作る
 static inline void
@@ -467,8 +489,7 @@ wf_iter_rule_mdct(wf_iterfunc_t wfif, long N, double w[])
 		{
 			RUBY_ASSERT(signbit(w[n]));
 			w[n] = isinf(w[n]) ? 1. : sqrt(w[n]/sum);
-			if (n == 0)  continue;
-			w[N-n] = w[n];
+			w[N-1-n] = w[n];
 		}
 		w[N/2] = 1.;
 	}
@@ -490,7 +511,6 @@ wf_iter_rule_mdct(wf_iterfunc_t wfif, long N, double w[])
 		w[N/2] = 1.;
 	}
 }
-
 
 void
 wf_iter_cb(wf_iterfunc_t wfif, long N, double w[])

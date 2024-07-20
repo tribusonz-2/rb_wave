@@ -29,24 +29,6 @@ typedef struct {
 
 void wf_iter_cb(wf_iterfunc_t wfif, long N, double w[]);
 
-#include <ruby/internal/memory.h> // ALLOC_N()
-#include <ruby/internal/intern/array.h> // rb_ary_new(), rb_ary_store()
-
-static inline VALUE
-rb_wf_iter(void (*func)(double, long, double *), long len, double param)
-{
-	VALUE ary = rb_ary_new2(len);
-	double *w = ALLOC_N(double, len);
-	
-	func(param, len, w);
-	
-	for (volatile long n = 0; n < len; n++)
-		rb_ary_store(ary, n, DBL2NUM(w[n]));
-	
-	return ary;
-}
-
-
 #if defined(__cplusplus)
 }
 #endif
