@@ -13,5 +13,7 @@
     * `#gaussian` (ガウス窓)  
     * `#kaiser` (カイザー窓)  
     * `#blackman_harris` (ブラックマン・ハリス窓)  
+    * `#nuttall` (ナットール窓)  
+    * `#blackman_nuttall` (ブラックマン・ナットール窓)  
     * `#flat_top` (フラットトップ窓)  
     * `#kbd` (カイザー・ベッセル派生窓)  

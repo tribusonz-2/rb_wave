@@ -498,7 +498,7 @@ wf_kaiser(int argc, VALUE *argv, VALUE unused_obj)
 #include "internal/solver/window_function/blackman_harris.h"
 
 static void
-wf_cb_blackman_harris(double alpha, long len, double w[])
+wf_cb_blackman_harris(double unused_obj, long len, double w[])
 {
 	wf_iterfunc_t wfif = { 
 		wf_blackman_harris_eval, 
@@ -538,6 +538,102 @@ static VALUE
 wf_blackman_harris(VALUE unused_obj, VALUE len)
 {
 	return rb_wf_ary_new(wf_cb_blackman_harris, NUM2LONG(len), 0.);
+}
+
+/*******************************************************************************
+	ナットール窓
+*******************************************************************************/
+#include "internal/solver/window_function/nuttall.h"
+
+static void
+wf_cb_nuttall(double unused_param, long len, double w[])
+{
+	wf_iterfunc_t wfif = { 
+		wf_nuttall_eval, 
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.nuttall(len) -> [*Float]
+ *  
+ *  離散型ナットール窓の配列を返す．lenで配列数を指定する．
+ *  ナットール窓は以下の4項対称ブラックマン・ハリス窓
+ *  $ w(x)=a_0-a_1 cos(2\pi x) + a_2 cos(4\pi x) - a_3 cos(6\pi x), 0 \leq x \leq 1 $
+ *  をナットールの定義によるL点としたものである．
+ *  ここで$a_n$は係数であり，4点を以下とする．
+ *  $ \begin{array}{rcl} 
+ *     a_0 & = & \frac{88942}{250000} \\ 
+ *     a_1 & = & \frac{121849}{250000} \\ 
+ *     a_2 & = & \frac{36058}{250000} \\ 
+ *     a_3 & = & \frac{3151}{250000} 
+ *    \end{array} $
+ *  
+ *    Wave::WindowFunction.nuttall(5)
+ *    # => [0.009921342339417317,
+ *    # =>  0.37949865766058255,
+ *    # =>  1.0,
+ *    # =>  0.37949865766058255,
+ *    # =>  0.009921342339417317]
+ */
+static VALUE
+wf_nuttall(VALUE unused_obj, VALUE len)
+{
+	return rb_wf_ary_new(wf_cb_nuttall, NUM2LONG(len), 0.);
+}
+
+/*******************************************************************************
+	ブラックマン・ナットール窓
+*******************************************************************************/
+#include "internal/solver/window_function/blackman_nuttall.h"
+
+static void
+wf_cb_blackman_nuttall(double unused_obj, long len, double w[])
+{
+	wf_iterfunc_t wfif = { 
+		wf_blackman_nuttall_eval, 
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.blackman_nuttall(len) -> [*Float]
+ *  
+ *  離散型ブラックマン・ナットール窓の配列を返す．lenで配列数を指定する．
+ *  一般にブラックマン・ナットール窓は以下の式
+ *  $ w(x)=a_0-a_1 cos(2\pi x) + a_2 cos(4\pi x) - a_3 cos(6\pi x), 0 \leq x \leq 1 $
+ *  で定義される．
+ *  ここで$a_n$は最小4項の係数であり，以下の値を持つ．
+ *  $ \begin{array}{rcl} 
+ *     a_0 & = & \frac{3635819}{10000000} \\ 
+ *     a_1 & = & \frac{4891775}{10000000} \\ 
+ *     a_2 & = & \frac{1365995}{10000000} \\ 
+ *     a_3 & = & \frac{106411}{10000000} 
+ *    \end{array} $
+ *  
+ *    Wave::WindowFunction.blackman_nuttall(5)
+ *    # => [0.013328836896113066,
+ *    # =>  0.3956259131038869,
+ *    # =>  1.0,
+ *    # =>  0.3956259131038869,
+ *    # =>  0.013328836896113066]
+ */
+static VALUE
+wf_blackman_nuttall(VALUE unused_obj, VALUE len)
+{
+	return rb_wf_ary_new(wf_cb_blackman_nuttall, NUM2LONG(len), 0.);
 }
 
 /*******************************************************************************
@@ -613,6 +709,7 @@ wf_cb_kbd_with_param(double alpha, long len, double w[])
 /*
  *  call-seq:
  *    Wave::WindowFunction.kbd(x, alpha) -> [*Float]
+ *    Wave::WindowFunction.kaiser_bessel_derived(x, alpha) -> [*Float]
  *  
  *  離散型KBD窓の配列を返す．lenで配列数を指定する．
  *  KBD窓はカイザー・ベッセル・派生窓の頭文字語であり，カイザー窓を修正離散コサイン変換(MDCT)での使用に設計したものである．
@@ -648,9 +745,12 @@ InitVM_WindowFunction(void)
 	rb_define_module_function(rb_mWaveWindowFunction, "blackman", wf_blackman, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "gaussian", wf_gaussian, -1);
 	rb_define_module_function(rb_mWaveWindowFunction, "kaiser", wf_kaiser, -1);
+	rb_define_module_function(rb_mWaveWindowFunction, "nuttall", wf_nuttall, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "blackman_harris", wf_blackman_harris, 1);
+	rb_define_module_function(rb_mWaveWindowFunction, "blackman_nuttall", wf_blackman_nuttall, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "flat_top", wf_flat_top, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "kbd", wf_kbd, -1);
+	rb_define_module_function(rb_mWaveWindowFunction, "kaiser_bessel_derived", wf_kbd, -1);
 }
 
 /*******************************************************************************
