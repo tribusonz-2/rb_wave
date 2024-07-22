@@ -106,7 +106,95 @@ wf_rectangular(VALUE unused_obj, VALUE len)
 
 
 /*******************************************************************************
-	ハン窓
+	ハミング窓 / 一般化ハミング窓
+*******************************************************************************/
+#include "internal/solver/window_function/hamming.h"
+
+static void
+wf_cb_hamming(double unused_param, long len, double w[])
+{
+	wf_iterfunc_t wfif = {
+		wf_hamming_eval, 
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+#include "internal/solver/window_function/generalized_hamming.h"
+
+static void
+wf_cb_generalized_hamming(double alpha, long len, double w[])
+{
+	wf_iterfunc_t wfif = {
+		wf_generalized_hamming_eval, 
+		wf_generalized_hamming_calc_param(alpha),
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.hamming(len) -> [*Float]
+ *    Wave::WindowFunction.hamming(len, alpha) -> [*Float]
+ *  
+ *  離散型ハミング窓の配列を返す．lenで配列数を指定する．
+ *  ハミング窓はよく使われる窓関数の一つである．
+ *  離散型のハミング窓は通常以下で定義される:
+ *  $ w(x)=\frac{25}{46}-\frac{21}{46}\cos(2\pi{x}), 0 \leq x \leq 1 $
+ *  
+ *  第二引数に$\alpha$が当てられたときには配列数len分の離散型一般化ハミング窓の配列を返す．
+ *  一般化ハミング窓は．ハン窓とハミング窓を一般化したものであり，通常は実数パラメタ$\alpha$を定義域$\frac{1}{2}\leq\alpha 1$とするものである．
+ *  \alphaはこの定義域外の値のときにはRangeErrorの例外が発生する．電気数学では曖昧さも強みなため例外処理が働くのは珍しい．これは得られる値が期待とはかけ離れているためである．
+ *  離散型の一般化ハミング窓は通常以下で定義される:
+ *  $ w(x)=\alpha-(1-\alpha)\cos(2\pi{x}), 0 \leq x \leq 1 $
+ *  
+ *  
+ *     Wave::WindowFunction.hamming(5)
+ *     # => [0.174144415611437,
+ *     # =>  0.684551236562476,
+ *     # =>  1.0,
+ *     # =>  0.684551236562476,
+ *     # =>  0.17414441561143706]
+ *     Wave::WindowFunction.hamming(5, 25/46r)
+ *     # => [0.17414441561143695,
+ *     # =>  0.684551236562476,
+ *     # =>  1.0,
+ *     # =>  0.684551236562476,
+ *     # =>  0.17414441561143695]
+ *     
+ *     Wave::WindowFunction.hamming(5, 1)
+ *     # => [1.0, 1.0, 1.0, 1.0, 1.0]
+ *     Wave::WindowFunction.rectangular(5)
+ *     # => [1.0, 1.0, 1.0, 1.0, 1.0]
+ 
+ *     Wave::WindowFunction.hamming(5, 0) # => RangeError
+ */
+static VALUE
+wf_hamming(int argc, VALUE *argv, VALUE unused_obj)
+{
+	VALUE len, param = Qnil;
+	rb_scan_args(argc, argv, "11", &len, &param);
+	if (argc == 1)
+	{
+		return rb_wf_ary_new(wf_cb_hamming, NUM2LONG(len), 0.);
+	}
+	else
+	{
+		return rb_wf_ary_new(wf_cb_generalized_hamming, NUM2LONG(len), NUM2DBL(param));
+	}
+}
+
+
+/*******************************************************************************
+	ハン窓 / パラメタ化されたハン窓
 *******************************************************************************/
 #include "internal/solver/window_function/hann.h"
 
@@ -128,6 +216,8 @@ wf_cb_hann(double unused_param, long len, double w[])
  *  call-seq:
  *    Wave::WindowFunction.hann(len) -> [*Float]
  *    Wave::WindowFunction.hanning(len) -> [*Float]
+ *    Wave::WindowFunction.hann(len, alpha) -> [*Float]
+ *    Wave::WindowFunction.hanning(len, alpha) -> [*Float]
  *  
  *  離散型ハン窓の配列を返す．lenで配列数を指定する．
  *  ハン窓はよく使われる窓関数の一つである．
@@ -136,60 +226,38 @@ wf_cb_hann(double unused_param, long len, double w[])
  *  $ w(x)=\frac{1}{2}-\frac{1}{2}\cos(2\pi{x}), 0 \leq x \leq 1 $
  *  ここで，係数$\alpha=\frac{1}{2}$は余弦の項の次数$1-\alpha$の関係がある．
  *  
+ *  第二引数alphaが当てられた場合，パラメタ化されたハン窓をlen分の配列を確保し返す．
+ *  $\alpha$は実数パラメタであり，定義域を$\frac{1}{2}\leq\alpha 1$とするものである．
+ *  \alphaはこの定義域外の値のときにはRangeErrorの例外が発生する．電気数学では曖昧さも強みなため例外処理が働くのは珍しい．これは得られる値が期待とはかけ離れているためである． *  
+ 
  *    Wave::WindowFunction.hann(5)
  *    # => [0.09549150281252627,
  *    # =>  0.6545084971874737,
  *    # =>  1.0,
  *    # =>  0.6545084971874737,
  *    # =>  0.09549150281252633]
+ *    Wave::WindowFunction.hann(5, 0.5)
+ *    # => [0.09549150281252627,
+ *    # =>  0.6545084971874737,
+ *    # =>  1.0,
+ *    # =>  0.6545084971874737,
+ *    # =>  0.09549150281252627]
  */
 static VALUE
-wf_hann(VALUE unused_obj, VALUE len)
+wf_hann(int argc, VALUE *argv, VALUE unused_obj)
 {
-	return rb_wf_ary_new(wf_cb_hann, NUM2LONG(len), 0.);
+	VALUE len, param = Qnil;
+	rb_scan_args(argc, argv, "11", &len, &param);
+	if (argc == 1)
+	{
+		return rb_wf_ary_new(wf_cb_hann, NUM2LONG(len), 0.);
+	}
+	else
+	{
+		return rb_wf_ary_new(wf_cb_generalized_hamming, NUM2LONG(len), NUM2DBL(param));
+	}
 }
 
-
-/*******************************************************************************
-	ハミング窓
-*******************************************************************************/
-#include "internal/solver/window_function/hamming.h"
-
-static void
-wf_cb_hamming(double unused_param, long len, double w[])
-{
-	wf_iterfunc_t wfif = {
-		wf_hamming_eval, 
-		0.,
-		WFIF_ITER_1D,
-		WFIF_NOCNTL,
-		WFIF_NOCNTL,
-		WFIF_NOCNTL
-	};
-	wf_iter_cb(wfif, len, w);
-}
-
-/*
- *  call-seq:
- *    Wave::WindowFunction.hamming(len) -> [*Float]
- *  
- *  離散型ハミング窓の配列を返す．lenで配列数を指定する．
- *  ハミング窓はよく使われる窓関数の一つである．
- *  離散型のハミング窓は通常以下で定義される:
- *  $ w(x)=\frac{25}{46}-\frac{21}{46}\cos(2\pi{x}), 0 \leq x \leq 1 $
- *  
- *     Wave::WindowFunction.hamming(5)
- *     # => [0.174144415611437,
- *     # =>  0.684551236562476,
- *     # =>  1.0,
- *     # =>  0.684551236562476,
- *     # =>  0.17414441561143706]
- */
-static VALUE
-wf_hamming(VALUE unused_obj, VALUE len)
-{
-	return rb_wf_ary_new(wf_cb_hamming, NUM2LONG(len), 0.);
-}
 
 /*******************************************************************************
 	バートレット窓
@@ -425,6 +493,105 @@ wf_kaiser(int argc, VALUE *argv, VALUE unused_obj)
 }
 
 /*******************************************************************************
+	ブラックマン・ハリス窓
+*******************************************************************************/
+#include "internal/solver/window_function/blackman_harris.h"
+
+static void
+wf_cb_blackman_harris(double alpha, long len, double w[])
+{
+	wf_iterfunc_t wfif = { 
+		wf_blackman_harris_eval, 
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.blackman_harris(len) -> [*Float]
+ *  
+ *  離散型ブラックマン・ハリス窓の配列を返す．lenで配列数を指定する．
+ *  一般にブラックマン・ハリス窓は以下の式
+ *  $ w(x)=a_0-a_1 cos(2\pi x) + a_2 cos(4\pi x) - a_3 cos(6\pi x), 0 \leq x \leq 1 $
+ *  の最小4項で定義される．
+ *  ここで$a_n$は最小4項の係数であり，以下の平均値・中央値が$\frac{1}{4}$な値を持つ．
+ *  $ \begin{array}{rcl} 
+ *     a_0 & = & \frac{35875}{100000} \\ 
+ *     a_1 & = & \frac{48829}{100000} \\ 
+ *     a_2 & = & \frac{14128}{100000} \\ 
+ *     a_3 & = & \frac{1168}{100000} 
+ *    \end{array} $
+ *  
+ *    Wave::WindowFunction.blackman_harris(5)
+ *    # => [0.010982331276248888,
+ *    # =>  0.3858926687237511,
+ *    # =>  1.0,
+ *    # =>  0.3858926687237511,
+ *    # =>  0.010982331276248888]
+ */
+static VALUE
+wf_blackman_harris(VALUE unused_obj, VALUE len)
+{
+	return rb_wf_ary_new(wf_cb_blackman_harris, NUM2LONG(len), 0.);
+}
+
+/*******************************************************************************
+	フラットトップ窓
+*******************************************************************************/
+#include "internal/solver/window_function/flat_top.h"
+
+static void
+wf_cb_flat_top(double alpha, long len, double w[])
+{
+	wf_iterfunc_t wfif = { 
+		wf_flat_top_eval, 
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.flat_top(len) -> [*Float]
+ *  
+ *  離散型フラットトップ窓の配列を返す．lenで配列数を指定する．
+ *  一般にフラットトップ窓は以下の式
+ *  $w(x)=a_0-a_1\cos(2\pi x)+a_2\cos(4\pi x)-a_3\cos(6\pi x)+a_4\cos(8\pi x), 0\leq x\leq1$
+ *  で定義される．
+ *  ここで$a_n$は係数であり，値は各々以下である．
+ *  $ \begin{array}{rcl} 
+ *     a_0 & = & \frac{215578947}{1000000000} \\ 
+ *     a_1 & = & \frac{416631580}{1000000000} \\ 
+ *     a_2 & = & \frac{277263158}{1000000000} \\ 
+ *     a_3 & = & \frac{83578947}{1000000000} \\ 
+ *     a_4 & = & \frac{6947368}{1000000000}
+ *    \end{array} $
+ *  
+ *    Wave::WindowFunction.flat_top(5)
+ *    # => [-0.015597277660432994,
+ *    # =>  0.054544645160432864,
+ *    # =>  1.0,
+ *    # =>  0.054544645160432864,
+ *    # =>  -0.015597277660432994]
+ */
+static VALUE
+wf_flat_top(VALUE unused_obj, VALUE len)
+{
+	return rb_wf_ary_new(wf_cb_flat_top, NUM2LONG(len), 0.);
+}
+
+
+
+/*******************************************************************************
 	KBD窓 (カイザー・ベッセル派生窓)
 *******************************************************************************/
 #include "internal/solver/window_function/kbd_with_param.h"
@@ -474,13 +641,15 @@ void
 InitVM_WindowFunction(void)
 {
 	rb_define_module_function(rb_mWaveWindowFunction, "rectangular", wf_rectangular, 1);
-	rb_define_module_function(rb_mWaveWindowFunction, "hann", wf_hann, 1);
-	rb_define_module_function(rb_mWaveWindowFunction, "hanning", wf_hann, 1);
-	rb_define_module_function(rb_mWaveWindowFunction, "hamming", wf_hamming, 1);
+	rb_define_module_function(rb_mWaveWindowFunction, "hann", wf_hann, -1);
+	rb_define_module_function(rb_mWaveWindowFunction, "hanning", wf_hann, -1);
+	rb_define_module_function(rb_mWaveWindowFunction, "hamming", wf_hamming, -1);
 	rb_define_module_function(rb_mWaveWindowFunction, "bartlett", wf_bartlett, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "blackman", wf_blackman, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "gaussian", wf_gaussian, -1);
 	rb_define_module_function(rb_mWaveWindowFunction, "kaiser", wf_kaiser, -1);
+	rb_define_module_function(rb_mWaveWindowFunction, "blackman_harris", wf_blackman_harris, 1);
+	rb_define_module_function(rb_mWaveWindowFunction, "flat_top", wf_flat_top, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "kbd", wf_kbd, -1);
 }
 
