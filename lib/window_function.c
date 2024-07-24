@@ -22,7 +22,7 @@ double cyl_bessel_i0(double);
  *  ユーザレベル実装は実行速度よりはアルゴリズム集としてのテストスィートの色が強い．デジタルフィルタリングではdouble型のスカラ型をアロケートして，役目を終えれば使い捨てるのが実際である．
  *  モジュールを使うのはFFTの窓掛けとして周波数特性の分析が最もで，デジタルフィルタを開発するならば，C APIを用いるなどして，コアクラス開発者との合流が望ましい．
  *  
- *  窓関数の配列は一度の生成につき100は下らない．マスター周波数が96kHzなら、その倍の配列数を生成することになる．
+ *  窓関数の配列は一度の生成につき100は下らない．マスター周波数が96kHzなら，その倍の配列数を生成することになる．
  *  このためコールバック方式を採用し，イテレーションに組み込むことで，高速な生成を実現している．
  *  設計思想は青木直史博士に基づいている．
  *  
@@ -70,7 +70,7 @@ rb_wf_ary_new(void (*func)(double, long, double *), long len, double param)
 }
 
 /*******************************************************************************
-	レクタンギュラ窓
+	ディリクレ窓 / 矩形窓(レクタンギュラ窓)
 *******************************************************************************/
 #include "internal/solver/window_function/rectangular.h"
 
@@ -90,10 +90,11 @@ wf_cb_rectangular(double unused_param, long len, double w[])
 
 /*
  *  call-seq:
+ *    Wave::WindowFunction.dirichlet(len) -> [*Float]
  *    Wave::WindowFunction.rectangular(len) -> [*Float]
  *  
- *  離散型レクタンギュラ窓の配列を返す．lenで配列数を指定する．
- *  レクタンギュラ窓はよく使われる窓関数の一つである．常に1.0のスカラー量となる．
+ *  離散型ディリクレ窓の配列を返す．lenで配列数を指定する．
+ *  ディリクレ窓は矩形窓(レクタンギュラ窓)としてよく知られ，よく使われる窓関数の一つである．常に1.0のスカラー量となる．
  *  
  *    Wave::WindowFunction.rectangular(5)
  *    # => [1.0, 1.0, 1.0, 1.0, 1.0]
@@ -157,25 +158,25 @@ wf_cb_generalized_hamming(double alpha, long len, double w[])
  *  $ w(x)=\alpha-(1-\alpha)\cos(2\pi{x}), 0 \leq x \leq 1 $
  *  
  *  
- *     Wave::WindowFunction.hamming(5)
- *     # => [0.174144415611437,
- *     # =>  0.684551236562476,
- *     # =>  1.0,
- *     # =>  0.684551236562476,
- *     # =>  0.17414441561143706]
- *     Wave::WindowFunction.hamming(5, 25/46r)
- *     # => [0.17414441561143695,
- *     # =>  0.684551236562476,
- *     # =>  1.0,
- *     # =>  0.684551236562476,
- *     # =>  0.17414441561143695]
- *     
- *     Wave::WindowFunction.hamming(5, 1)
- *     # => [1.0, 1.0, 1.0, 1.0, 1.0]
- *     Wave::WindowFunction.rectangular(5)
- *     # => [1.0, 1.0, 1.0, 1.0, 1.0]
- 
- *     Wave::WindowFunction.hamming(5, 0) # => RangeError
+ *    Wave::WindowFunction.hamming(5)
+ *    # => [0.174144415611437,
+ *    # =>  0.684551236562476,
+ *    # =>  1.0,
+ *    # =>  0.684551236562476,
+ *    # =>  0.17414441561143706]
+ *    Wave::WindowFunction.hamming(5, 25/46r)
+ *    # => [0.17414441561143695,
+ *    # =>  0.684551236562476,
+ *    # =>  1.0,
+ *    # =>  0.684551236562476,
+ *    # =>  0.17414441561143695]
+ *    
+ *    Wave::WindowFunction.hamming(5, 1)
+ *    # => [1.0, 1.0, 1.0, 1.0, 1.0]
+ *    Wave::WindowFunction.rectangular(5)
+ *    # => [1.0, 1.0, 1.0, 1.0, 1.0]
+ *    
+ *    Wave::WindowFunction.hamming(5, 0) # => RangeError
  */
 static VALUE
 wf_hamming(int argc, VALUE *argv, VALUE unused_obj)
@@ -242,6 +243,13 @@ wf_cb_hann(double unused_param, long len, double w[])
  *    # =>  1.0,
  *    # =>  0.6545084971874737,
  *    # =>  0.09549150281252627]
+ *    
+ *    Wave::WindowFunction.hann(5, 1)
+ *    # => [1.0, 1.0, 1.0, 1.0, 1.0]
+ *    Wave::WindowFunction.rectangular(5)
+ *    # => [1.0, 1.0, 1.0, 1.0, 1.0]
+ *    
+ *    Wave::WindowFunction.hann(5, 0) # => RangeError
  */
 static VALUE
 wf_hann(int argc, VALUE *argv, VALUE unused_obj)
@@ -493,6 +501,47 @@ wf_kaiser(int argc, VALUE *argv, VALUE unused_obj)
 }
 
 /*******************************************************************************
+	バートレット・ハン窓
+*******************************************************************************/
+#include "internal/solver/window_function/bartlett_hann.h"
+
+static void
+wf_cb_bartlett_hann(double unused_obj, long len, double w[])
+{
+	wf_iterfunc_t wfif = { 
+		wf_bartlett_hann_eval, 
+		0.,
+		WFIF_ITER_1D,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL,
+		WFIF_NOCNTL
+	};
+	wf_iter_cb(wfif, len, w);
+}
+
+/*
+ *  call-seq:
+ *    Wave::WindowFunction.bartlett_hann(len) -> [*Float]
+ *  
+ *  離散型の修正バートレット・ハン窓の配列を返す．lenで配列数を指定する．
+ *  修正バートレット・ハン窓は
+ *  $ w(x)=0.62-0.48 |x - 0.5| + 0.38 \cos(2\pi(x - 0.5)) , 0 \leq x \leq 1 $
+ *  で定義される．ここで$|x|$は絶対値である．
+ *  
+ *    Wave::WindowFunction.bartlett_hann(5)
+ *    # => [0.12057354213751997,
+ *    # =>  0.6414264578624801,
+ *    # =>  1.0,
+ *    # =>  0.6414264578624801,
+ *    # =>  0.12057354213751997]
+ */
+static VALUE
+wf_bartlett_hann(VALUE unused_obj, VALUE len)
+{
+	return rb_wf_ary_new(wf_cb_bartlett_hann, NUM2LONG(len), 0.);
+}
+
+/*******************************************************************************
 	ブラックマン・ハリス窓
 *******************************************************************************/
 #include "internal/solver/window_function/blackman_harris.h"
@@ -738,6 +787,7 @@ void
 InitVM_WindowFunction(void)
 {
 	rb_define_module_function(rb_mWaveWindowFunction, "rectangular", wf_rectangular, 1);
+	rb_define_module_function(rb_mWaveWindowFunction, "dirichlet", wf_rectangular, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "hann", wf_hann, -1);
 	rb_define_module_function(rb_mWaveWindowFunction, "hanning", wf_hann, -1);
 	rb_define_module_function(rb_mWaveWindowFunction, "hamming", wf_hamming, -1);
@@ -745,6 +795,7 @@ InitVM_WindowFunction(void)
 	rb_define_module_function(rb_mWaveWindowFunction, "blackman", wf_blackman, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "gaussian", wf_gaussian, -1);
 	rb_define_module_function(rb_mWaveWindowFunction, "kaiser", wf_kaiser, -1);
+	rb_define_module_function(rb_mWaveWindowFunction, "bartlett_hann", wf_bartlett_hann, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "nuttall", wf_nuttall, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "blackman_harris", wf_blackman_harris, 1);
 	rb_define_module_function(rb_mWaveWindowFunction, "blackman_nuttall", wf_blackman_nuttall, 1);
