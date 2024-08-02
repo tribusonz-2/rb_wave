@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 static inline double
-wf_blackman_harris_eval(double n, long N, double unused_param)
+wf_blackman_harris_expr(double n, long N, double unused_param)
 {
 	static const double coef[4] = 
 	{

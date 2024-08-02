@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 static inline double
-wf_hamming_eval(double n, long N, double unused_param)
+wf_hamming_expr(double n, long N, double unused_param)
 {
 	static const double coef1 = 25./46.;
 	static const double coef2 = 21./46.;

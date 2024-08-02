@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 static inline double
-wf_hann_eval(double n, long N, double unused_param)
+wf_hann_expr(double n, long N, double unused_param)
 {
 	return 0.5 - 0.5 * cos(2.0 * M_PI * n / N);
 }

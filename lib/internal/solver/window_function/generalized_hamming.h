@@ -15,7 +15,7 @@ wf_generalized_hamming_calc_param(double alpha)
 }
 
 static inline double
-wf_generalized_hamming_eval(double n, long N, double alpha)
+wf_generalized_hamming_expr(double n, long N, double alpha)
 {
 	return alpha - (1 - alpha) * cos(2.0 * M_PI * n / N);
 }

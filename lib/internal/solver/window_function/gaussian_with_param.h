@@ -59,7 +59,7 @@ wf_gaussian_calc_param(double sigma)
 }
 
 static inline double
-wf_gaussian_with_param_eval(double n, long N, double t2)
+wf_gaussian_with_param_expr(double n, long N, double t2)
 {
 	double t1 = -1 + 2. * n / N;
 	return exp(-(t1 * t1 / t2));

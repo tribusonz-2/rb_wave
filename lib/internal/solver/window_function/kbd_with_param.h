@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 static inline double
-wf_kbd_with_param_eval(double n, long N, double alpha)
+wf_kbd_with_param_expr(double n, long N, double alpha)
 {
 	const double t1 = 4.0 * n / N - 1.0;
 	return cyl_bessel_i0(M_PI * alpha * sqrt(1.0 - t1 * t1));

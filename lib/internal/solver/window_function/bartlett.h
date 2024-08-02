@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 static inline double
-wf_bartlett_eval(double n, long N, double unused_param)
+wf_bartlett_expr(double n, long N, double unused_param)
 {
 	return 1 - 2 * fabs(n / N - 0.5);
 }

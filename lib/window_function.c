@@ -6,7 +6,7 @@
 #include <ruby.h>
 //#include <ruby/internal/memory.h> // ALLOC_N()
 //#include <ruby/internal/intern/array.h> // rb_ary_new(), rb_ary_store()
-#include "include/wave.h"
+#include "ruby/wave/globals.h"
 #include "internal/algorithm/wf.h"
 
 #ifndef HAVE_CYL_BESSEL_I0
@@ -18,16 +18,24 @@ double cyl_bessel_i0(double);
 /*
  *  module Wave::WindowFunction
  *  
- *  Wave::WindowFunctionモジュールは，波形フィルタリングでよく用いられる離散型の窓関数をRubyのユーザレベルから叩けるようにしたフロントエンドである．
- *  ユーザレベル実装は実行速度よりはアルゴリズム集としてのテストスィートの色が強い．デジタルフィルタリングではdouble型のスカラ型をアロケートして，役目を終えれば使い捨てるのが実際である．
- *  モジュールを使うのはFFTの窓掛けとして周波数特性の分析が最もで，デジタルフィルタを開発するならば，C APIを用いるなどして，コアクラス開発者との合流が望ましい．
+ *  Wave::WindowFunction is modularizes the window functions that used at the C level.
+ *  The implementation is a discrete type often used in waveform filtering.
+ *  DSP programming is multi-threaded, and the implementation like this is called "user-level" as opposed to kernel-level.
+ *  The implementation is more focused on test suites as a collection of algorithms than on execution speed; 
+ *  In digital filtering, a double scalar type is actually allocated at the kernel level and discarded once its purpose is completed.
+ *  If you want to get serious about DSP programming, it's best to use the API directly at the C level.
  *  
- *  窓関数の配列は一度の生成につき100は下らない．マスター周波数が96kHzなら，その倍の配列数を生成することになる．
- *  このためコールバック方式を採用し，イテレーションに組み込むことで，高速な生成を実現している．
- *  設計思想は青木直史博士に基づいている．
+ *  A callback method is used for array generation.
+ *  The number of window function arrays is no less than 100 per generates at once. 
+ *  If the master frequency is 96kHz, you will generate twice that number of arrays;
+ *  This problem is solved by incorporating callback function into the iteration to speed up processing.
  *  
- *  連続型の窓関数は0を中央値とするx軸を変数とし，定義域を$-\frac{1}{2}\leq{x}\leq\frac{1}{2}$とする．
- *  離散型はxの定義域を$0 \leq x \leq 1$と限定し，配列数を四分位とした離散信号を用いるという異なったアプローチを持っている．
+ *  The design philosophy is based on Dr. Naofumi Aoki.
+ *  
+ *  By the way, the continuous window function uses the x-axis as a variable with 0 as the median value, 
+ *  and the domain is do: $-\frac{1}{2}\leq{x}\leq\frac{1}{2}$
+ *  The discrete type has a different approach in that it limits the domain of x to "$0 \leq x \leq 1$"
+ *  and uses a discrete signal with the number of arrays as quartiles.
  *  
  *    def cont_hann(x)
  *      if (-0.5 <= x && x <= 0.5)
@@ -70,7 +78,7 @@ rb_wf_ary_new(void (*func)(double, long, double *), long len, double param)
 }
 
 /*******************************************************************************
-	ディリクレ窓 / 矩形窓(レクタンギュラ窓)
+	Dirichlet Window / Rectangular Window
 *******************************************************************************/
 #include "internal/solver/window_function/rectangular.h"
 
@@ -78,7 +86,7 @@ static void
 wf_cb_rectangular(double unused_param, long len, double w[])
 {
 	wf_iterfunc_t wfif = {
-		wf_rectangular_eval,
+		wf_rectangular_expr,
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -93,8 +101,9 @@ wf_cb_rectangular(double unused_param, long len, double w[])
  *    Wave::WindowFunction.dirichlet(len) -> [*Float]
  *    Wave::WindowFunction.rectangular(len) -> [*Float]
  *  
- *  離散型ディリクレ窓の配列を返す．lenで配列数を指定する．
- *  ディリクレ窓は矩形窓(レクタンギュラ窓)としてよく知られ，よく使われる窓関数の一つである．常に1.0のスカラー量となる．
+ *  Returns an array of discrete rectangular windows. Specify the number of arrays with len.
+ *  In Europe, it is well known as the "Dirichlet window" and is one of the most commonly used window functions. 
+ *  It is always a scalar quantity of 1.0.
  *  
  *    Wave::WindowFunction.rectangular(5)
  *    # => [1.0, 1.0, 1.0, 1.0, 1.0]
@@ -107,7 +116,7 @@ wf_rectangular(VALUE unused_obj, VALUE len)
 
 
 /*******************************************************************************
-	ハミング窓 / 一般化ハミング窓
+	Hamming Window / Generalized Hamming Window
 *******************************************************************************/
 #include "internal/solver/window_function/hamming.h"
 
@@ -115,7 +124,7 @@ static void
 wf_cb_hamming(double unused_param, long len, double w[])
 {
 	wf_iterfunc_t wfif = {
-		wf_hamming_eval, 
+		wf_hamming_expr, 
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -131,7 +140,7 @@ static void
 wf_cb_generalized_hamming(double alpha, long len, double w[])
 {
 	wf_iterfunc_t wfif = {
-		wf_generalized_hamming_eval, 
+		wf_generalized_hamming_expr, 
 		wf_generalized_hamming_calc_param(alpha),
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -146,15 +155,20 @@ wf_cb_generalized_hamming(double alpha, long len, double w[])
  *    Wave::WindowFunction.hamming(len) -> [*Float]
  *    Wave::WindowFunction.hamming(len, alpha) -> [*Float]
  *  
- *  離散型ハミング窓の配列を返す．lenで配列数を指定する．
- *  ハミング窓はよく使われる窓関数の一つである．
- *  離散型のハミング窓は通常以下で定義される:
+ *  Returns an array of discrete Hamming windows. Specify the number of arrays with len.
+ *  Hamming window is one of the commonly used window functions.
+ *  A discrete Hamming window is usually defined as:
  *  $ w(x)=\frac{25}{46}-\frac{21}{46}\cos(2\pi{x}), 0 \leq x \leq 1 $
  *  
- *  第二引数に$\alpha$が当てられたときには配列数len分の離散型一般化ハミング窓の配列を返す．
- *  一般化ハミング窓は．ハン窓とハミング窓を一般化したものであり，通常は実数パラメタ$\alpha$を定義域$\frac{1}{2}\leq\alpha 1$とするものである．
- *  \alphaはこの定義域外の値のときにはRangeErrorの例外が発生する．電気数学では曖昧さも強みなため例外処理が働くのは珍しい．これは得られる値が期待とはかけ離れているためである．
- *  離散型の一般化ハミング窓は通常以下で定義される:
+ *  When $\alpha$ is assigned as the second argument, returns an array of discrete generalized Hamming windows for the number of arrays len.
+ *  The generalized Hamming window is a generalization of the Hann window and the Hamming window, 
+ *  and usually takes the real parameter $\alpha$ as the domain $\frac{1}{2}\leq\alpha 1$.
+ *  
+ *  If $\alpha$ is a value outside this domain, a RangeError exception will occur. 
+ *  By the way, ambiguity is a strength in electrical mathematics, so it is not appropriate for exception handling to work. 
+ *  This occurs because the value obtained is far from the expected value.
+ *  
+ *  A discrete generalized Hamming window is usually defined as:
  *  $ w(x)=\alpha-(1-\alpha)\cos(2\pi{x}), 0 \leq x \leq 1 $
  *  
  *  
@@ -195,7 +209,7 @@ wf_hamming(int argc, VALUE *argv, VALUE unused_obj)
 
 
 /*******************************************************************************
-	ハン窓 / パラメタ化されたハン窓
+	Hann window / Parameterized Hann window
 *******************************************************************************/
 #include "internal/solver/window_function/hann.h"
 
@@ -203,7 +217,7 @@ static void
 wf_cb_hann(double unused_param, long len, double w[])
 {
 	wf_iterfunc_t wfif = {
-		wf_hann_eval,
+		wf_hann_expr,
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -220,17 +234,20 @@ wf_cb_hann(double unused_param, long len, double w[])
  *    Wave::WindowFunction.hann(len, alpha) -> [*Float]
  *    Wave::WindowFunction.hanning(len, alpha) -> [*Float]
  *  
- *  離散型ハン窓の配列を返す．lenで配列数を指定する．
- *  ハン窓はよく使われる窓関数の一つである．
- *  この関数はパラメタ修正されたハミング窓に因んでハニング窓とも呼ばれる．
- *  離散型のハン窓は通常以下で定義される:
+ *  Returns an array of discrete Hann windows. Specify the number of arrays with len.
+ *  The Hann window is one of the commonly used window functions.
+ *  This function is also called the 'Hanning window' after the parameter-modified Hamming window.
+ *  A discrete Hann window is usually defined as:
  *  $ w(x)=\frac{1}{2}-\frac{1}{2}\cos(2\pi{x}), 0 \leq x \leq 1 $
- *  ここで，係数$\alpha=\frac{1}{2}$は余弦の項の次数$1-\alpha$の関係がある．
+ *  Where, the coefficient $\alpha=\frac{1}{2}$ is related to the order $1-\alpha$ on the cosine term.
  *  
- *  第二引数alphaが当てられた場合，パラメタ化されたハン窓をlen分の配列を確保し返す．
- *  $\alpha$は実数パラメタであり，定義域を$\frac{1}{2}\leq\alpha 1$とするものである．
- *  \alphaはこの定義域外の値のときにはRangeErrorの例外が発生する．電気数学では曖昧さも強みなため例外処理が働くのは珍しい．これは得られる値が期待とはかけ離れているためである． *  
- 
+ *  If the second argument alpha is given, the return value is a parameterized Hann window.
+ *  $\alpha$ is a real parameter whose domain is $\frac{1}{2}\leq\alpha 1$.
+ *  
+ *  If $\alpha$ is a value outside this domain, a RangeError exception will occur. 
+ *  By the way, ambiguity is a strength in electrical mathematics, so it is not appropriate for exception handling to work. 
+ *  This occurs because the value obtained is far from the expected value.
+ *  
  *    Wave::WindowFunction.hann(5)
  *    # => [0.09549150281252627,
  *    # =>  0.6545084971874737,
@@ -268,7 +285,7 @@ wf_hann(int argc, VALUE *argv, VALUE unused_obj)
 
 
 /*******************************************************************************
-	バートレット窓
+	Bartlett Window
 *******************************************************************************/
 #include "internal/solver/window_function/bartlett.h"
 
@@ -276,7 +293,7 @@ static void
 wf_cb_bartlett(double unused_param, long len, double w[])
 {
 	wf_iterfunc_t wfif = {
-		wf_bartlett_eval,
+		wf_bartlett_expr,
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -290,9 +307,9 @@ wf_cb_bartlett(double unused_param, long len, double w[])
  *  call-seq:
  *    Wave::WindowFunction.bartlett(len) -> [*Float]
  *  
- *  離散型バートレット窓の配列を返す．lenで配列数を指定する．
- *  バートレット窓は三角窓とも呼ばれ，よくリファレンスに出てくる窓関数である．
- *  定義式は以下で表せる．
+ *  Returns an array of discrete Bartlett windows. Specify the number of arrays with len.
+ *  The Bartlett window, also known as the triangular window, is a window function that often appears in reference books.
+ *  The definition can be expressed as follows:
  *  $w(x)=1-2\left| x-\frac{1}{2} \right|, 0 \leq x \leq 1$
  
  *    Wave::WindowFunction.bartlett(5)
@@ -309,7 +326,7 @@ wf_bartlett(VALUE unused_obj, VALUE len)
 }
 
 /*******************************************************************************
-	ブラックマン窓
+	Blackman Window
 *******************************************************************************/
 #include "internal/solver/window_function/blackman.h"
 
@@ -317,7 +334,7 @@ static void
 wf_cb_blackman(double unused_param, long len, double w[])
 {
 	wf_iterfunc_t wfif = {
-		wf_blackman_eval,
+		wf_blackman_expr,
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -331,9 +348,9 @@ wf_cb_blackman(double unused_param, long len, double w[])
  *  call-seq:
  *    Wave::WindowFunction.blackman(len) -> [*Float]
  *  
- *  離散型ブラックマン窓の配列を返す．lenで配列数を指定する．
- *  ブラックマン窓はよく使われる窓関数である．
- *  定義式は以下で表せる．
+ *  Returns an array of discrete Blackman windows. Specify the number of arrays with len.
+ *  The Blackman window is a commonly used window function.
+ *  The definition can be expressed as follows:
  *  $w(x)=0.42-0.5\cos(2\pi x)+0.08\cos(4\pi x), 0 \leq x \leq 1$
  *  
  *    Wave::WindowFunction.blackman(5)
@@ -350,7 +367,7 @@ wf_blackman(VALUE unused_obj, VALUE len)
 }
 
 /*******************************************************************************
-	ガウス窓
+	Gaussian Window
 *******************************************************************************/
 #include "internal/solver/window_function/gaussian.h"
 
@@ -358,7 +375,7 @@ static void
 wf_cb_gaussian(double unused_param, long len, double w[])
 {
 	wf_iterfunc_t wfif = {
-		wf_gaussian_eval, 
+		wf_gaussian_expr, 
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -374,7 +391,7 @@ static void
 wf_cb_gaussian_with_param(double sigma, long len, double w[])
 {
 	wf_iterfunc_t wfif = {
-		wf_gaussian_with_param_eval, 
+		wf_gaussian_with_param_expr, 
 		wf_gaussian_calc_param(sigma),
 		WFIF_ITER_1D,
 		WFIF_KURT,
@@ -389,10 +406,11 @@ wf_cb_gaussian_with_param(double sigma, long len, double w[])
  *    Wave::WindowFunction.gaussian(len) -> [*Float]
  *    Wave::WindowFunction.gaussian(len, sigma) -> [*Float]
  
- *  離散型ガウス窓の配列を返す．lenで配列数を指定する．
- *  一般に，離散型のガウス窓は以下の式を満たす．
+ *  Returns an array of discrete Gaussian windows. Specify the number of arrays with len.
+ *  In general, a discrete Gaussian window satisfies the following equation:
  *  $w(x)=e^{-((-1+2x)^2/8\sigma^2)}, 0 \leq{x}\leq 1$
- *  ここで，$\sigma$は標準偏差である．標準偏差は$3/10$としたとき，以下を等式とする．
+ *  Where $\sigma$ is the standard deviation. 
+ *  If the standard deviation is $3/10$, the following equation is created.
  *  $w(x) = w(x, 3/10)$
  
  *    Wave::WindowFunction.gaussian(5)
@@ -424,7 +442,7 @@ wf_gaussian(int argc, VALUE *argv, VALUE unused_obj)
 }
 
 /*******************************************************************************
-	カイザー窓
+	Kaiser Window
 *******************************************************************************/
 #include "internal/solver/window_function/kaiser.h"
 
@@ -432,7 +450,7 @@ static void
 wf_cb_kaiser(double unused_param, long len, double w[])
 {
 	wf_iterfunc_t wfif = {
-		wf_kaiser_eval, 
+		wf_kaiser_expr, 
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -448,7 +466,7 @@ static void
 wf_cb_kaiser_with_param(double alpha, long len, double w[])
 {
 	wf_iterfunc_t wfif = { 
-		wf_kaiser_with_param_eval, 
+		wf_kaiser_with_param_expr, 
 		alpha,
 		WFIF_ITER_1D,
 		WFIF_KURT,
@@ -460,16 +478,16 @@ wf_cb_kaiser_with_param(double alpha, long len, double w[])
 
 /*
  *  call-seq:
- *    Wave::WindowFunction.kaiser(x) -> [*Float]
- *    Wave::WindowFunction.kaiser(x, alpha) -> [*Float]
+ *    Wave::WindowFunction.kaiser(len) -> [*Float]
+ *    Wave::WindowFunction.kaiser(len, alpha) -> [*Float]
  *  
- *  離散型カイザー窓の配列を返す．lenで配列数を指定する．
- *  カイザー窓はカイザー・ベッセル窓としても知られ，一般に有限インパルス応答{FIR}フィルタ設計とスペクトル分析に使用される．
- *  離散型のカイザー窓は次式
+ *  Returns an array of discrete Kaiser windows. Specify the number of arrays with len.
+ *  The Kaiser window, also known as the Kaiser-Bessel window, is commonly used in finite impulse response {FIR} filter design and spectral analysis.
+ *  The discrete Kaiser window is given by
  *  $ w(x)=\frac{I_0(\alpha 2 \sqrt{-(x-1)x}}{I_0(\alpha)} $
- *  を得る．
- *  ただし，$ I_n(x) $は第一種変形ベッセル関数，nはゼロ次であり．$\alpha$は形状パラメタである．
- *  以下は等価である．
+ *  We obtain.
+ *  Where $I_n(x)$ is the first kind of modified Bessel function, n is the zeroth order, and $\alpha$ is the shape parameter.
+ *  The following are equivalent:
  *  $ w(x) = w(x, 3) $
  *  
  *    Wave::WindowFunction.kaiser(5)
@@ -501,7 +519,7 @@ wf_kaiser(int argc, VALUE *argv, VALUE unused_obj)
 }
 
 /*******************************************************************************
-	バートレット・ハン窓
+	Bartlett - Hann Window
 *******************************************************************************/
 #include "internal/solver/window_function/bartlett_hann.h"
 
@@ -509,7 +527,7 @@ static void
 wf_cb_bartlett_hann(double unused_obj, long len, double w[])
 {
 	wf_iterfunc_t wfif = { 
-		wf_bartlett_hann_eval, 
+		wf_bartlett_hann_expr, 
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -523,10 +541,10 @@ wf_cb_bartlett_hann(double unused_obj, long len, double w[])
  *  call-seq:
  *    Wave::WindowFunction.bartlett_hann(len) -> [*Float]
  *  
- *  離散型の修正バートレット・ハン窓の配列を返す．lenで配列数を指定する．
- *  修正バートレット・ハン窓は
+ *  Returns an array of discrete (modified) Bartlett-Hann windows. Specify the number of arrays with len.
+ *  The modified Bartlett-Hann window is
  *  $ w(x)=0.62-0.48 |x - 0.5| + 0.38 \cos(2\pi(x - 0.5)) , 0 \leq x \leq 1 $
- *  で定義される．ここで$|x|$は絶対値である．
+ *  is defined as. where $|x|$ is the absolute value of x.
  *  
  *    Wave::WindowFunction.bartlett_hann(5)
  *    # => [0.12057354213751997,
@@ -542,7 +560,7 @@ wf_bartlett_hann(VALUE unused_obj, VALUE len)
 }
 
 /*******************************************************************************
-	ブラックマン・ハリス窓
+	Blackman-Harris window
 *******************************************************************************/
 #include "internal/solver/window_function/blackman_harris.h"
 
@@ -550,7 +568,7 @@ static void
 wf_cb_blackman_harris(double unused_obj, long len, double w[])
 {
 	wf_iterfunc_t wfif = { 
-		wf_blackman_harris_eval, 
+		wf_blackman_harris_expr, 
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -564,11 +582,11 @@ wf_cb_blackman_harris(double unused_obj, long len, double w[])
  *  call-seq:
  *    Wave::WindowFunction.blackman_harris(len) -> [*Float]
  *  
- *  離散型ブラックマン・ハリス窓の配列を返す．lenで配列数を指定する．
- *  一般にブラックマン・ハリス窓は以下の式
+ *  Returns an array of discrete Blackman-Harris windows. Specify the number of arrays with len.
+ *  In general, the Blackman-Harris window is given by the following formula
  *  $ w(x)=a_0-a_1 cos(2\pi x) + a_2 cos(4\pi x) - a_3 cos(6\pi x), 0 \leq x \leq 1 $
- *  の最小4項で定義される．
- *  ここで$a_n$は最小4項の係数であり，以下の平均値・中央値が$\frac{1}{4}$な値を持つ．
+ *  defined by it as a minimum of four terms.
+ *  Where, $a_n$ is the coefficient of the smallest four terms, and the mean and median of the following are $\frac{1}{4}$.
  *  $ \begin{array}{rcl} 
  *     a_0 & = & \frac{35875}{100000} \\ 
  *     a_1 & = & \frac{48829}{100000} \\ 
@@ -590,7 +608,7 @@ wf_blackman_harris(VALUE unused_obj, VALUE len)
 }
 
 /*******************************************************************************
-	ナットール窓
+	Nuttall Window
 *******************************************************************************/
 #include "internal/solver/window_function/nuttall.h"
 
@@ -598,7 +616,7 @@ static void
 wf_cb_nuttall(double unused_param, long len, double w[])
 {
 	wf_iterfunc_t wfif = { 
-		wf_nuttall_eval, 
+		wf_nuttall_expr, 
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -612,11 +630,11 @@ wf_cb_nuttall(double unused_param, long len, double w[])
  *  call-seq:
  *    Wave::WindowFunction.nuttall(len) -> [*Float]
  *  
- *  離散型ナットール窓の配列を返す．lenで配列数を指定する．
- *  ナットール窓は以下の4項対称ブラックマン・ハリス窓
+ *  Returns an array of discrete Nuttall windows. Specify the number of arrays with len.
+ *  The Nuttall window is a four-term symmetric Blackman-Harris window as
  *  $ w(x)=a_0-a_1 cos(2\pi x) + a_2 cos(4\pi x) - a_3 cos(6\pi x), 0 \leq x \leq 1 $
- *  をナットールの定義によるL点としたものである．
- *  ここで$a_n$は係数であり，4点を以下とする．
+ *  is the L point according to Nuttall's definition.
+ *  Where, $a_n$ is a coefficient and is set to 4 or less.
  *  $ \begin{array}{rcl} 
  *     a_0 & = & \frac{88942}{250000} \\ 
  *     a_1 & = & \frac{121849}{250000} \\ 
@@ -638,7 +656,7 @@ wf_nuttall(VALUE unused_obj, VALUE len)
 }
 
 /*******************************************************************************
-	ブラックマン・ナットール窓
+	Blackman-Nutall window
 *******************************************************************************/
 #include "internal/solver/window_function/blackman_nuttall.h"
 
@@ -646,7 +664,7 @@ static void
 wf_cb_blackman_nuttall(double unused_obj, long len, double w[])
 {
 	wf_iterfunc_t wfif = { 
-		wf_blackman_nuttall_eval, 
+		wf_blackman_nuttall_expr, 
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -660,11 +678,11 @@ wf_cb_blackman_nuttall(double unused_obj, long len, double w[])
  *  call-seq:
  *    Wave::WindowFunction.blackman_nuttall(len) -> [*Float]
  *  
- *  離散型ブラックマン・ナットール窓の配列を返す．lenで配列数を指定する．
- *  一般にブラックマン・ナットール窓は以下の式
+ *  Returns an array of discrete Blackman-Nuttal windows. Specify the number of arrays with len.
+ *  In general, the Blackman-Nuttal window is expressed by the following formula:
  *  $ w(x)=a_0-a_1 cos(2\pi x) + a_2 cos(4\pi x) - a_3 cos(6\pi x), 0 \leq x \leq 1 $
- *  で定義される．
- *  ここで$a_n$は最小4項の係数であり，以下の値を持つ．
+ *  is defined as.
+ *  Where, $a_n$ are the coefficients of the smallest four terms and have the following values:
  *  $ \begin{array}{rcl} 
  *     a_0 & = & \frac{3635819}{10000000} \\ 
  *     a_1 & = & \frac{4891775}{10000000} \\ 
@@ -686,7 +704,7 @@ wf_blackman_nuttall(VALUE unused_obj, VALUE len)
 }
 
 /*******************************************************************************
-	フラットトップ窓
+	Flat Top Window
 *******************************************************************************/
 #include "internal/solver/window_function/flat_top.h"
 
@@ -694,7 +712,7 @@ static void
 wf_cb_flat_top(double alpha, long len, double w[])
 {
 	wf_iterfunc_t wfif = { 
-		wf_flat_top_eval, 
+		wf_flat_top_expr, 
 		0.,
 		WFIF_ITER_1D,
 		WFIF_NOCNTL,
@@ -708,11 +726,11 @@ wf_cb_flat_top(double alpha, long len, double w[])
  *  call-seq:
  *    Wave::WindowFunction.flat_top(len) -> [*Float]
  *  
- *  離散型フラットトップ窓の配列を返す．lenで配列数を指定する．
- *  一般にフラットトップ窓は以下の式
+ *  Returns an array of discrete flat-top windows. Specify the number of arrays with len.
+ *  In general, flat top windows are defined by the following formula
  *  $w(x)=a_0-a_1\cos(2\pi x)+a_2\cos(4\pi x)-a_3\cos(6\pi x)+a_4\cos(8\pi x), 0\leq x\leq1$
- *  で定義される．
- *  ここで$a_n$は係数であり，値は各々以下である．
+ *  is defined as.
+ *  Where, $a_n$ are coefficients, and their values ​​are as follows:
  *  $ \begin{array}{rcl} 
  *     a_0 & = & \frac{215578947}{1000000000} \\ 
  *     a_1 & = & \frac{416631580}{1000000000} \\ 
@@ -737,7 +755,7 @@ wf_flat_top(VALUE unused_obj, VALUE len)
 
 
 /*******************************************************************************
-	KBD窓 (カイザー・ベッセル派生窓)
+	KBD Window (Kayser-Bessel derived window)
 *******************************************************************************/
 #include "internal/solver/window_function/kbd_with_param.h"
 
@@ -745,7 +763,7 @@ static void
 wf_cb_kbd_with_param(double alpha, long len, double w[])
 {
 	wf_iterfunc_t wfif = { 
-		wf_kbd_with_param_eval, 
+		wf_kbd_with_param_expr, 
 		alpha,
 		WFIF_ITER_MDCT,
 		WFIF_RECT,
@@ -760,8 +778,9 @@ wf_cb_kbd_with_param(double alpha, long len, double w[])
  *    Wave::WindowFunction.kbd(x, alpha) -> [*Float]
  *    Wave::WindowFunction.kaiser_bessel_derived(x, alpha) -> [*Float]
  *  
- *  離散型KBD窓の配列を返す．lenで配列数を指定する．
- *  KBD窓はカイザー・ベッセル・派生窓の頭文字語であり，カイザー窓を修正離散コサイン変換(MDCT)での使用に設計したものである．
+ *  Returns an array of discrete KBD windows. Specify the number of arrays with len.
+ *  KBD window is an acronym for Kaiser-Bessel-derived window, 
+ *  a variation of the Kaiser window designed for use in the modified discrete cosine transform (MDCT).
  *  
  *    Wave::WindowFunction.kbd(5, 3)
  *    # => [0.4114947429371883,
@@ -782,7 +801,7 @@ wf_kbd(int argc, VALUE *argv, VALUE unused_obj)
 
 /******************************************************************************/
 
-// エントリポイント
+// Entry Point
 void
 InitVM_WindowFunction(void)
 {
@@ -808,7 +827,6 @@ InitVM_WindowFunction(void)
 	for C API
 *******************************************************************************/
 
-// レクタンギュラの配列を作る
 static inline void
 wf_iter_make_rect(long N, double w[])
 {
@@ -816,11 +834,10 @@ wf_iter_make_rect(long N, double w[])
 		w[n] = 1.;
 }
 
-// 中央値が1，他が0の配列を作る
 static inline void
 wf_iter_make_kurt(long N, double w[])
 {
-	if (N % 2 == 0) /* サイズが偶数のとき */
+	if (N % 2 == 0)
 	{
 		for (volatile long n = 0; n < (N/2); n++)
 		{
@@ -834,7 +851,7 @@ wf_iter_make_kurt(long N, double w[])
 		}
 		w[N/2] = 1.;
 	}
-	else /* サイズが奇数のとき */
+	else
 	{
 		for (volatile long n = 0; n < (N/2); n++)
 		{
@@ -845,7 +862,6 @@ wf_iter_make_kurt(long N, double w[])
 	}
 }
 
-// 特殊な窓関数配列を生成する
 static inline void
 wf_iter_cb_sp(enum WFIF_SP_EVAL_TYPE handle, long N, double w[])
 {
@@ -862,7 +878,6 @@ wf_iter_cb_sp(enum WFIF_SP_EVAL_TYPE handle, long N, double w[])
 	}
 }
 
-// エラーハンドリング
 static inline enum WFIF_SP_EVAL_TYPE
 wf_iter_errhdl(wf_iterfunc_t wfif)
 {
@@ -878,11 +893,10 @@ wf_iter_errhdl(wf_iterfunc_t wfif)
 	return handle;
 }
 
-// 一元イテレータ・ルール
 static inline void
 wf_iter_rule_1d(wf_iterfunc_t wfif, long N, double w[])
 {
-	if (N % 2 == 0) /* サイズが偶数のとき */
+	if (N % 2 == 0)
 	{
 		for (volatile long n = 0; n < (N/2); n++)
 		{
@@ -897,7 +911,7 @@ wf_iter_rule_1d(wf_iterfunc_t wfif, long N, double w[])
 		}
 		w[N/2] = 1.;
 	}
-	else /* サイズが奇数のとき */
+	else
 	{
 		for (volatile long n = 0; n < (N/2); n++)
 		{
@@ -909,13 +923,12 @@ wf_iter_rule_1d(wf_iterfunc_t wfif, long N, double w[])
 	}
 }
 
-// MDCTイテレータ・ルール(畳み込み和ルーチン)
 static inline void
 wf_iter_rule_mdct(wf_iterfunc_t wfif, long N, double w[])
 {
 	double sum = 0.;
 	
-	if (N % 2 == 0) /* サイズが偶数のとき */
+	if (N % 2 == 0)
 	{
 		for (volatile long n = 0; n < (N/2); n++)
 		{
@@ -932,7 +945,7 @@ wf_iter_rule_mdct(wf_iterfunc_t wfif, long N, double w[])
 		}
 		w[N/2] = 1.;
 	}
-	else /* サイズが奇数のとき */
+	else
 	{
 		for (volatile long n = 0; n < (N/2); n++)
 		{

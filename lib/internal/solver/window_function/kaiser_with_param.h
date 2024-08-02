@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 static inline double
-wf_kaiser_with_param_eval(double n, long N, double alpha)
+wf_kaiser_with_param_expr(double n, long N, double alpha)
 {
 	const double x = n / N;
 	static double prev_alpha, denom;

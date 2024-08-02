@@ -5,7 +5,7 @@
 *******************************************************************************/
 #include <ruby.h>
 #define USE_GLOBAL_VARIABLE
-#include "include/wave.h"
+#include "ruby/wave/globals.h"
 
 void InitVM_WindowFunction(void);
 

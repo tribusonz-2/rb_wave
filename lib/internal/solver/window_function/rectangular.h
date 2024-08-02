@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 static inline double
-wf_rectangular_eval(double n, long N, double unused_param)
+wf_rectangular_expr(double n, long N, double unused_param)
 {
 	return 1.;
 }

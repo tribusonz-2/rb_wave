@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 static inline double
-wf_gaussian_eval(double n, long N, double unused_param)
+wf_gaussian_expr(double n, long N, double unused_param)
 {
 	static const double t1 = -(25./18.);
 	const double t2 = (-1 + 2. * n / N);

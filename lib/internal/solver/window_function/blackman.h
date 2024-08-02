@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 static inline double
-wf_blackman_eval(double n, long N, double unused_param)
+wf_blackman_expr(double n, long N, double unused_param)
 {
 	return 0.42 - 
 		0.5 * cos(2 * M_PI * n / N) + 
