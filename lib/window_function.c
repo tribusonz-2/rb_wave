@@ -22,8 +22,7 @@ double cyl_bessel_i0(double);
  *  The implementation is a discrete type often used in waveform filtering.
  *  DSP programming is multi-threaded, and the implementation like this is called "user-level" as opposed to kernel-level.
  *  The implementation is more focused on test suites as a collection of algorithms than on execution speed; 
- *  In digital filtering, a double scalar type is actually allocated at the kernel level and discarded once its purpose is completed.
- *  If you want to get serious about DSP programming, it's best to use the API directly at the C level.
+ *  This module is unlikely to be used directly in DSP applications.
  *  
  *  A callback method is used for array generation.
  *  The number of window function arrays is no less than 100 per generates at once. 
