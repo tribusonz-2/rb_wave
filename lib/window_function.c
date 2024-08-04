@@ -18,6 +18,7 @@ double cyl_bessel_i0(double);
 /*
  *  module Wave::WindowFunction
  *  
+ *  - Overview -
  *  Wave::WindowFunction is modularizes the window functions that used at the C level.
  *  The implementation is a discrete type often used in waveform filtering.
  *  DSP programming is multi-threaded, and the implementation like this is called "user-level" as opposed to kernel-level.
@@ -60,6 +61,14 @@ double cyl_bessel_i0(double);
  *    # =>  0.6545084971874737,
  *    # =>  0.09549150281252633]
  *    ```
+ *  
+ *  - About algorithm -
+ *  This implementation employs an iterative process due to the discrete nature of the algorithm.
+ *  The iterator has the modified discrete cosine transform (so-called MDCT, which is used in audio processing), and the one-dimensional rule.
+ *  "one-dimensional" is so named in contrast to the discrete cosine transform which has poles.
+ *  Note that inverse functions also exist for window functions (MDCT windows also have them), 
+ *  however, since this module is a subclass of waveform, it does not contain these inverse algorithms.
+ *  
  */
 
 
@@ -790,8 +799,6 @@ wf_cb_kbd_with_param(double alpha, long len, double w[])
  *    # =>  0.9996957233074878,
  *    # =>  0.4114947429371883]
  *    # 
- *    # The KBD window is an MDCT window, and even array generation has different index offsets:
- *    
  */
 static VALUE
 wf_kbd(int argc, VALUE *argv, VALUE unused_obj)
