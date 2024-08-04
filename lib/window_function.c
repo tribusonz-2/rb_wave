@@ -64,7 +64,7 @@ double cyl_bessel_i0(double);
  *  
  *  - About algorithm -
  *  This implementation employs an iterative process due to the discrete nature of the algorithm.
- *  The iterator has the modified discrete cosine transform (so-called MDCT, which is used in audio processing), and the one-dimensional rule.
+ *  The iterator has the modified discrete cosine transform (another word for it is 'MDCT', which is used in audio processing), and the one-dimensional rule.
  *  "one-dimensional" is so named in contrast to the discrete cosine transform which has poles.
  *  Note that inverse functions also exist for window functions (MDCT windows also have them), 
  *  however, since this module is a subclass of waveform, it does not contain these inverse algorithms.
