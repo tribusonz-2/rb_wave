@@ -36,6 +36,7 @@ double cyl_bessel_i0(double);
  *  The discrete type has a different approach in that it limits the domain of x to "$0 \leq x \leq 1$"
  *  and uses a discrete signal with the number of arrays as quartiles.
  *  
+ *    ```Ruby
  *    def cont_hann(x)
  *      if (-0.5 <= x && x <= 0.5)
  *        0.5 + 0.5 * Math.cos(2 * Math::PI * x)
@@ -58,6 +59,7 @@ double cyl_bessel_i0(double);
  *    # =>  1.0,
  *    # =>  0.6545084971874737,
  *    # =>  0.09549150281252633]
+ *    ```
  */
 
 
@@ -787,6 +789,9 @@ wf_cb_kbd_with_param(double alpha, long len, double w[])
  *    # =>  1.0,
  *    # =>  0.9996957233074878,
  *    # =>  0.4114947429371883]
+ *    # 
+ *    # The KBD window is an MDCT window, and even array generation has different index offsets:
+ *    
  */
 static VALUE
 wf_kbd(int argc, VALUE *argv, VALUE unused_obj)
@@ -942,7 +947,6 @@ wf_iter_rule_mdct(wf_iterfunc_t wfif, long N, double w[])
 			w[n] = isinf(w[n]) ? 1. : sqrt(w[n]/sum);
 			w[N-1-n] = w[n];
 		}
-		w[N/2] = 1.;
 	}
 	else
 	{
