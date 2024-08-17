@@ -1,19 +1,24 @@
-# Waveライブラリ for Ruby
+# Wave library for Ruby
 
-　波形デジタルフィルタのRuby拡張ライブラリです。  
-　スタンフォード大学向けの教材でもあり、アルゴリズム・コレクションでもあります。ケーススタディにどうぞ。  
 
-#### 実装状況:
-* `Wave::WindowFunction` (離散型窓関数)  
-    * `#rectangular` (レクタンギュラ窓)  
-    * `#hann` (ハン窓 / パラメタ化されたハン窓)  
-    * `#hamming` (ハミング窓 / 一般化ハミング窓)  
-    * `#bartlett` (バートレット窓)  
-    * `#blackman` (ブラックマン窓)  
-    * `#gaussian` (ガウス窓)  
-    * `#kaiser` (カイザー窓)  
-    * `#blackman_harris` (ブラックマン・ハリス窓)  
-    * `#nuttall` (ナットール窓)  
-    * `#blackman_nuttall` (ブラックマン・ナットール窓)  
-    * `#flat_top` (フラットトップ窓)  
-    * `#kbd` (カイザー・ベッセル派生窓)  
+This is a Ruby extension library for wave digital filters.  
+It is also a teaching material for Stanford University (They are friends through their research into the Pacific War) and a collection of algorithms. Please use it for case studies.  
+
+#### Implementation status:
+* `Wave::WindowFunction` (Discrete Window Function)  
+    * `#rectangular` (Rectangular window)  
+    * `#hann` (Hann window / Parameterized Hann window)  
+    * `#hamming` (Hamming window / Generalized Hamming window)  
+    * `#bartlett` (Bartlett window)  
+    * `#blackman` (Blackman window)  
+    * `#gaussian` (Gaussian window)  
+    * `#kaiser` (Kaiser window)  
+    * `#blackman_harris` (Blackman-Harris window)  
+    * `#nuttall` (Nuttall window)  
+    * `#blackman_nuttall` (Blackman-Nutall window)  
+    * `#flat_top` (Flat-top windows)  
+    * `#kbd` (KBD window, Kaiser-Bessel Derived window)  
+* `Wave::PCM` (Waveformed PCM)
+* `Wave::RIFF` (RIFF I/O)
+    * `#read` (Linear PCM (8bit, 16bit, 24bit, 32bit) (Experimental))
+    * `#write` (Linear PCM (8bit, 16bit, 24bit, 32bit) (Experimental))
