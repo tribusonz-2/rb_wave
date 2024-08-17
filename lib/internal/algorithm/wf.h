@@ -1,10 +1,6 @@
 #ifndef RB_WAVE_ALGO_WF_H_INCLUDED
 #define RB_WAVE_ALGO_WF_H_INCLUDED
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 enum WFIF_ITER_RULE {
 	WFIF_ITER_1D,  // 1-dimensional Iterator
 	WFIF_ITER_MDCT // Modified-DCT with convolutional summation
@@ -28,9 +24,5 @@ typedef struct {
 
 
 void wf_iter_cb(wf_iterfunc_t wfif, long N, double w[]);
-
-#if defined(__cplusplus)
-}
-#endif
 
 #endif /* RB_WAVE_ALGO_WF_H_INCLUDED */
