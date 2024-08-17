@@ -268,16 +268,16 @@ wave_normalize(double x, double min, double max, double rate)
 void
 pcm_write_8bit(unsigned char buf[], double s[])
 {
-	double dizitize = wave_normalize(s[0], INT8_MIN, INT8_MAX, 0x80);
+	double digitize = wave_normalize(s[0], INT8_MIN, INT8_MAX, 0x80);
 	
-	*buf = (unsigned char)(dizitize + 0x80);
+	*buf = (unsigned char)(digitize + 0x80);
 }
 
 void
 pcm_write_16bit(unsigned char buf[], double s[])
 {
-	double dizitize = wave_normalize(s[0], INT16_MIN, INT16_MAX, 0x8000);
-	int16_t bytes = (int16_t)dizitize;
+	double digitize = wave_normalize(s[0], INT16_MIN, INT16_MAX, 0x8000);
+	int16_t bytes = (int16_t)digitize;
 	
 	buf[0] = bytes & 0xFF;
 	buf[1] = (bytes >> 8) & 0xFF;
@@ -286,8 +286,8 @@ pcm_write_16bit(unsigned char buf[], double s[])
 void
 pcm_write_24bit(unsigned char buf[], double s[])
 {
-	double dizitize = wave_normalize(s[0], -0x800000, 0x7FFFFF, 0x800000);
-	int32_t bytes = (int32_t)dizitize;
+	double digitize = wave_normalize(s[0], -0x800000, 0x7FFFFF, 0x800000);
+	int32_t bytes = (int32_t)digitize;
 
 	buf[0] = bytes & 0xFF;
 	buf[1] = (bytes >> 8) & 0xFF;
@@ -297,8 +297,8 @@ pcm_write_24bit(unsigned char buf[], double s[])
 void
 pcm_write_32bit(unsigned char buf[], double s[])
 {
-	double dizitize = wave_normalize(s[0], INT32_MIN, INT32_MAX, 0x80000000);
-	int32_t bytes = (int32_t)dizitize;
+	double digitize = wave_normalize(s[0], INT32_MIN, INT32_MAX, 0x80000000);
+	int32_t bytes = (int32_t)digitize;
 
 	buf[0] = bytes & 0xFF;
 	buf[1] = (bytes >> 8) & 0xFF;
