@@ -5,9 +5,6 @@
 	
 	@license: MIT Licence
 	
-	Matz would say, "I came up with this design," 
-	and van Rossum would probably say, "I can't think of any other design."
-	
 *******************************************************************************/
 #include <ruby.h>
 #include <ruby/io.h>
