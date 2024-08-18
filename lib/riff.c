@@ -34,7 +34,7 @@ qbyte2u32le(VALUE bytes)
 void
 pcm_read_8bit(unsigned char buf[], double s[])
 {
-	char data = (buf[0] - 128);
+	char data = (buf[0] - 0x80);
 	*s = data / (double)0x80;
 }
 
@@ -249,7 +249,7 @@ ary_all_pcm_p(VALUE ary)
 }
 
 
-static double
+static inline double
 fclip(double x, double min, double max)
 {
 	return fmin(fmax(min, x), max);
@@ -259,7 +259,7 @@ static inline double
 wave_normalize(double x, double min, double max, double rate)
 {
 	if (x != x)  x = 0;
-	return fclip(round(x * rate), min, max);
+	return fclip(x * rate, min, max);
 }
 
 void
@@ -310,15 +310,10 @@ io_writepartial(VALUE io, VALUE buf)
 		rb_raise(rb_eIOError, "write failure");
 }
 
-// #define imax(a, b) ((a) > (b) ? (a) : (b))
-// #define imin(a, b) ((a) < (b) ? (a) : (b))
-// #define iclip(x, min, max) return imin(imax(min, x), max)
-
 static VALUE
 rb_str_cat_uintle(VALUE str, uint32_t value, size_t sz)
 {
 	static char s[4];
-//	sz = iclip(sz, 1, 4);
 	rb_integer_pack(ULL2NUM(value), s, sz, 8, 0, 
 		INTEGER_PACK_LITTLE_ENDIAN | INTEGER_PACK_2COMP);
 	return rb_str_buf_cat(str, s, sz);
@@ -532,6 +527,8 @@ wave_write_linear_pcm(VALUE pcm_ary, int16_t bits, char *file_name)
 static VALUE
 test_wave_write_linear_pcm(VALUE unused_obj, VALUE fname, VALUE pcm_ary, VALUE bits)
 {
+	if (TYPE(pcm_ary) != T_ARRAY)
+		rb_raise(rb_eTypeError, "not an Array");
 	return wave_write_linear_pcm(pcm_ary, NUM2INT(bits), StringValuePtr(fname));
 }
 
