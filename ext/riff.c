@@ -13,6 +13,18 @@
 #include "internal/riffchunk.h"
 #include <stdint.h>
 
+#define SupportedVersion "1.0.0"
+
+struct RIFF {
+	VALUE f; // File
+	uint16_t format_type; // wave_format_type
+	uint16_t bits; // bits_per_sample (Dependence by 'wave_format_type')
+	uint32_t sampling_rate; // blocks_per_second
+	uint16_t channels; // Number of channels
+	uint16_t samples_per_block;
+} ;
+
+
 
 static uint16_t
 dbyte2u16le(VALUE bytes)
@@ -81,12 +93,7 @@ static inline VALUE
 wave_read_linear_pcm(char *file_name)
 {
 	const int BUFFER_SIZE = 0x1000;
-	VALUE io = rb_funcall(
-		rb_cFile, 
-		rb_intern("open"),
-		2, 
-		rb_str_new_cstr(file_name), 
-		rb_str_new_cstr("rb"));
+	VALUE io = rb_file_open(file_name, "rb");
 	VALUE io_buf = rb_str_new(0,0);
 	
 	uint32_t riff_chunk_size;
@@ -208,18 +215,18 @@ wave_read_linear_pcm(char *file_name)
 		if ((1. * data_offset + buffer_size) > data_chunk_size)
 			buffer_size = data_chunk_size - data_offset;
 		io_readpartial(io, io_buf, buffer_size);
-		unsigned char *ptr = (unsigned char *)RSTRING_PTR(io_buf);
+		unsigned char *buf_ptr = (unsigned char *)RSTRING_PTR(io_buf);
 		for ( ; ; )
 		{
 			for (long i = 0; i < channels; i++)
 			{
-				double *s = mat[i];
-				func(ptr+(i*block_size/channels), s+idx);
+				double *s_ptr = mat[i];
+				func(buf_ptr+(i*block_size/channels), s_ptr+idx);
 			}
 			idx += samples_per_block;
-			ptr += block_size;
+			buf_ptr += block_size;
 			
-			if (ptr == (unsigned char *)RSTRING_END(io_buf))
+			if (buf_ptr == (unsigned char *)RSTRING_END(io_buf))
 				break;
 		}
 	}
@@ -360,12 +367,7 @@ wave_write_linear_pcm(VALUE pcm_ary, int16_t bits, char *file_name)
 	if (!ary_all_pcm_p(pcm_ary))
 		rb_raise(rb_eArgError, "not a %"PRIsVALUE"", rb_cWavePCM);
 	
-	VALUE io = rb_funcall(
-		rb_cFile, 
-		rb_intern("open"),
-		2, 
-		rb_str_new_cstr(file_name), 
-		rb_str_new_cstr("wb"));
+	VALUE io = rb_file_open(file_name, "wb");
 	VALUE io_buf;
 	
 	char riff_chunk_ID[4];
@@ -495,18 +497,18 @@ wave_write_linear_pcm(VALUE pcm_ary, int16_t bits, char *file_name)
 		else if (RSTRING_LEN(io_buf) != buffer_size)
 			rb_str_buf_z_resize(io_buf, buffer_size);
 		
-		unsigned char *ptr = (unsigned char *)RSTRING_PTR(io_buf);
+		unsigned char *buf_ptr = (unsigned char *)RSTRING_PTR(io_buf);
 		for ( ; ; )
 		{
 			for (long i = 0; i < channels; i++)
 			{
-				double *s = mat[i];
-				func(ptr+(i*block_size/channels), s+idx);
+				double *s_ptr = mat[i];
+				func(buf_ptr+(i*block_size/channels), s_ptr+idx);
 			}
 			idx += samples_per_block;
-			ptr += block_size;
+			buf_ptr += block_size;
 			
-			if (ptr == (unsigned char *)RSTRING_END(io_buf))
+			if (buf_ptr == (unsigned char *)RSTRING_END(io_buf))
 			{
 				io_writepartial(io, io_buf);
 				break;
@@ -535,6 +537,7 @@ test_wave_write_linear_pcm(VALUE unused_obj, VALUE fname, VALUE pcm_ary, VALUE b
 void
 InitVM_RIFF(void)
 {
+	rb_define_const(rb_cWaveRIFF, "SupportedVersion", rb_str_new_cstr(SupportedVersion));
 	rb_define_singleton_method(rb_cWaveRIFF, "write_linear_pcm", test_wave_write_linear_pcm, 3);
 	rb_define_singleton_method(rb_cWaveRIFF, "read_linear_pcm", test_wave_read_linear_pcm, 1);
 }
